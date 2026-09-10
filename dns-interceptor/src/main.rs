@@ -1,4 +1,5 @@
 mod config;
+mod dns;
 mod server;
 
 use config::Config;
