@@ -10,6 +10,8 @@ function DnsRecordsPage() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingRecord, setEditingRecord] = useState(null);
+  const [deletingRecord, setDeletingRecord] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [feedback, setFeedback] = useState(null);
 
   const fetchRecords = async () => {
@@ -52,6 +54,38 @@ function DnsRecordsPage() {
     setTimeout(() => {
       setFeedback(null);
     }, 4000);
+  };
+
+  const handleRecordDeleted = async (recordToDelete) => {
+    if (!recordToDelete || !recordToDelete.id) return;
+    setIsDeleting(true);
+    try {
+      const success = await dnsService.deleteRecord(recordToDelete.id);
+      if (success) {
+        await fetchRecords();
+        setFeedback({
+          type: 'success',
+          text: `Registro DNS (${recordToDelete.domain} - ${recordToDelete.id}) eliminado exitosamente.`,
+        });
+      } else {
+        setFeedback({
+          type: 'error',
+          text: `No se pudo eliminar el registro DNS con ID ${recordToDelete.id}.`,
+        });
+      }
+    } catch (err) {
+      console.error('Error al eliminar el registro DNS:', err);
+      setFeedback({
+        type: 'error',
+        text: `Error al eliminar el registro: ${err.message || err}`,
+      });
+    } finally {
+      setIsDeleting(false);
+      setDeletingRecord(null);
+      setTimeout(() => {
+        setFeedback(null);
+      }, 4000);
+    }
   };
 
   const filteredRecords = useMemo(() => {
@@ -182,7 +216,11 @@ function DnsRecordsPage() {
                       >
                         ✏️
                       </button>
-                      <button className="btn-icon delete" title="Eliminar (Visual)">
+                      <button
+                        className="btn-icon delete"
+                        title="Eliminar Registro"
+                        onClick={() => setDeletingRecord(record)}
+                      >
                         🗑️
                       </button>
                     </div>
@@ -211,10 +249,66 @@ function DnsRecordsPage() {
         onRecordUpdated={handleRecordUpdated}
         initialData={editingRecord}
       />
+
+      {/* Modal de Confirmación de Eliminación */}
+      {deletingRecord && (
+        <div className="modal-overlay" onClick={() => setDeletingRecord(null)}>
+          <div className="modal-container" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '480px' }}>
+            <div className="modal-header">
+              <h3 className="modal-title">⚠️ Confirmar Eliminación</h3>
+              <button className="modal-close-btn" onClick={() => setDeletingRecord(null)}>
+                ✕
+              </button>
+            </div>
+
+            <div style={{ margin: '1rem 0', lineHeight: 1.6 }}>
+              <p>¿Está seguro de que desea eliminar el siguiente registro DNS?</p>
+              <div style={{ background: 'var(--bg-dark)', border: '1px solid var(--border-color)', padding: '1rem', borderRadius: '0.5rem', marginTop: '0.75rem' }}>
+                <p style={{ fontWeight: 600, color: 'var(--text-main)' }}>Dominio: {deletingRecord.domain}</p>
+                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>ID: {deletingRecord.id} | Tipo: {deletingRecord.type}</p>
+                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>IP / Información: {deletingRecord.mainInfo}</p>
+              </div>
+              <p style={{ fontSize: '0.85rem', color: '#f87171', marginTop: '0.75rem' }}>
+                Esta acción eliminará el registro local y no se puede deshacer.
+              </p>
+            </div>
+
+            <div className="modal-footer">
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => setDeletingRecord(null)}
+                disabled={isDeleting}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => handleRecordDeleted(deletingRecord)}
+                disabled={isDeleting}
+                style={{
+                  background: 'var(--danger)',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '0.5rem',
+                  padding: '0.65rem 1.25rem',
+                  fontWeight: 600,
+                  fontSize: '0.9rem',
+                  cursor: isDeleting ? 'not-allowed' : 'pointer',
+                  opacity: isDeleting ? 0.7 : 1,
+                }}
+              >
+                {isDeleting ? 'Eliminando...' : 'Sí, Eliminar Registro'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
 export default DnsRecordsPage;
+
 
 
