@@ -22,7 +22,7 @@
     <slf4j.version>2.0.13</slf4j.version>
     <junit.version>5.10.2</junit.version>
 
-    <main.class>cr.ac.tec.ic7602.dnsapi.Main</main.class>
+    <main.class>dnsapi.Main</main.class>
   </properties>
 
   <dependencies>
