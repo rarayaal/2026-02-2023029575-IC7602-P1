@@ -9,6 +9,7 @@ function DnsRecordsPage() {
   const [typeFilter, setTypeFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingRecord, setEditingRecord] = useState(null);
   const [feedback, setFeedback] = useState(null);
 
   const fetchRecords = async () => {
@@ -35,7 +36,19 @@ function DnsRecordsPage() {
       type: 'success',
       text: `Registro DNS (${created.domain} - ${created.id}) creado exitosamente.`,
     });
-    // Ocultar mensaje automáticamente a los 4 segundos
+    setTimeout(() => {
+      setFeedback(null);
+    }, 4000);
+  };
+
+  const handleRecordUpdated = async (id, updatedData) => {
+    const updated = await dnsService.updateRecord(id, updatedData);
+    await fetchRecords();
+    setEditingRecord(null);
+    setFeedback({
+      type: 'success',
+      text: `Registro DNS (${updated.domain} - ${updated.id}) actualizado exitosamente.`,
+    });
     setTimeout(() => {
       setFeedback(null);
     }, 4000);
@@ -162,7 +175,11 @@ function DnsRecordsPage() {
                       <button className="btn-icon view" title="Ver detalle (Visual)">
                         👁️
                       </button>
-                      <button className="btn-icon edit" title="Editar (Visual)">
+                      <button
+                        className="btn-icon edit"
+                        title="Editar Registro"
+                        onClick={() => setEditingRecord(record)}
+                      >
                         ✏️
                       </button>
                       <button className="btn-icon delete" title="Eliminar (Visual)">
@@ -183,15 +200,21 @@ function DnsRecordsPage() {
         </table>
       </div>
 
-      {/* Modal de Creación */}
+      {/* Modal de Creación / Edición */}
       <CreateRecordModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        isOpen={isModalOpen || Boolean(editingRecord)}
+        onClose={() => {
+          setIsModalOpen(false);
+          setEditingRecord(null);
+        }}
         onRecordCreated={handleRecordCreated}
+        onRecordUpdated={handleRecordUpdated}
+        initialData={editingRecord}
       />
     </div>
   );
 }
 
 export default DnsRecordsPage;
+
 

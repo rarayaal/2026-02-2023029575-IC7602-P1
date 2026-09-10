@@ -1,6 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
-function CreateRecordModal({ isOpen, onClose, onRecordCreated }) {
+function CreateRecordModal({
+  isOpen,
+  onClose,
+  onRecordCreated,
+  onRecordUpdated,
+  initialData = null,
+}) {
+  const isEditMode = Boolean(initialData && initialData.id);
+
   const [type, setType] = useState('single');
   const [domain, setDomain] = useState('');
   const [ttl, setTtl] = useState(300);
@@ -32,8 +40,6 @@ function CreateRecordModal({ isOpen, onClose, onRecordCreated }) {
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  if (!isOpen) return null;
-
   const resetForm = () => {
     setType('single');
     setDomain('');
@@ -52,6 +58,61 @@ function CreateRecordModal({ isOpen, onClose, onRecordCreated }) {
     ]);
     setError('');
   };
+
+  useEffect(() => {
+    if (isOpen) {
+      if (initialData) {
+        // Cargar datos existentes para Modo Edición
+        setType(initialData.type || 'single');
+        setDomain(initialData.domain || '');
+        setTtl(initialData.ttl || 300);
+        setHealthCheck(
+          initialData.healthCheck === 'Ninguno' ? '' : initialData.healthCheck || ''
+        );
+
+        const val = initialData.value || {};
+        if (initialData.type === 'single') {
+          setSingleIp(val.ip || initialData.mainInfo || '');
+        } else if (initialData.type === 'multi') {
+          setMultiIps(Array.isArray(val.ips) ? val.ips.join(', ') : '');
+        } else if (initialData.type === 'weight') {
+          setWeightItems(
+            Array.isArray(val.items) && val.items.length > 0
+              ? val.items.map((i) => ({
+                  ip: i.ip || '',
+                  weight: i.weight !== undefined ? i.weight : 50,
+                }))
+              : [{ ip: '', weight: 70 }, { ip: '', weight: 30 }]
+          );
+        } else if (initialData.type === 'round-trip') {
+          setRoundTripItems(
+            Array.isArray(val.items) && val.items.length > 0
+              ? val.items.map((i) => ({
+                  ip: i.ip || '',
+                  location: i.location || '',
+                  latencyMs: i.latencyMs !== undefined ? i.latencyMs : 10,
+                }))
+              : [{ ip: '', location: 'us-east', latencyMs: 12 }]
+          );
+        } else if (initialData.type === 'geo') {
+          setGeoMappings(
+            Array.isArray(val.mappings) && val.mappings.length > 0
+              ? val.mappings.map((m) => ({ country: m.country || '', ip: m.ip || '' }))
+              : [
+                  { country: 'US', ip: '' },
+                  { country: 'CR', ip: '' },
+                ]
+          );
+        }
+        setError('');
+      } else {
+        // Modo Creación
+        resetForm();
+      }
+    }
+  }, [isOpen, initialData]);
+
+  if (!isOpen) return null;
 
   const handleClose = () => {
     resetForm();
@@ -172,22 +233,31 @@ function CreateRecordModal({ isOpen, onClose, onRecordCreated }) {
         .join(' | ');
     }
 
-    const newRecordData = {
+    const recordData = {
       domain: domain.trim(),
       type,
       ttl: Number(ttl),
       value,
       mainInfo,
-      status: 'healthy',
       healthCheck: healthCheck.trim() || 'Ninguno',
     };
 
     setIsSubmitting(true);
     try {
-      await onRecordCreated(newRecordData);
+      if (isEditMode) {
+        await onRecordUpdated(initialData.id, recordData);
+      } else {
+        await onRecordCreated({
+          ...recordData,
+          status: 'healthy',
+        });
+      }
       resetForm();
     } catch (err) {
-      setError('Error al crear el registro: ' + (err.message || err));
+      setError(
+        (isEditMode ? 'Error al actualizar el registro: ' : 'Error al crear el registro: ') +
+          (err.message || err)
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -197,7 +267,11 @@ function CreateRecordModal({ isOpen, onClose, onRecordCreated }) {
     <div className="modal-overlay" onClick={handleClose}>
       <div className="modal-container" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h3 className="modal-title">➕ Agregar Nuevo Registro DNS</h3>
+          <h3 className="modal-title">
+            {isEditMode
+              ? `✏️ Editar Registro DNS (${initialData.id})`
+              : '➕ Agregar Nuevo Registro DNS'}
+          </h3>
           <button className="modal-close-btn" onClick={handleClose}>
             ✕
           </button>
@@ -464,7 +538,11 @@ function CreateRecordModal({ isOpen, onClose, onRecordCreated }) {
               className="btn-primary"
               disabled={isSubmitting}
             >
-              {isSubmitting ? 'Guardando...' : 'Guardar Registro'}
+              {isSubmitting
+                ? 'Guardando...'
+                : isEditMode
+                ? 'Guardar Cambios'
+                : 'Guardar Registro'}
             </button>
           </div>
         </form>
