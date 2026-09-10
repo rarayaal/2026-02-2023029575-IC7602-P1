@@ -1,23 +1,64 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { dnsService } from '../services/dnsService';
 
 function DashboardPage() {
-  // Datos estáticos/simulados para el Dashboard (Commit 3)
-  const stats = {
-    totalRecords: 24,
+  const [stats, setStats] = useState({
+    totalRecords: 0,
     byType: {
-      single: 8,
-      multi: 5,
-      weight: 4,
-      roundTrip: 4,
-      geo: 3,
+      single: 0,
+      multi: 0,
+      weight: 0,
+      roundTrip: 0,
+      geo: 0,
     },
     healthChecks: {
-      active: 18,
-      healthy: 15,
-      unhealthy: 3,
+      active: 0,
+      healthy: 0,
+      unhealthy: 0,
       unknown: 0,
     },
-  };
+  });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchStats() {
+      try {
+        const records = await dnsService.getRecords();
+        const byType = { single: 0, multi: 0, weight: 0, 'round-trip': 0, geo: 0 };
+        const healthChecks = { active: 0, healthy: 0, unhealthy: 0, unknown: 0 };
+
+        records.forEach((r) => {
+          if (byType[r.type] !== undefined) {
+            byType[r.type]++;
+          }
+          if (r.status === 'healthy') healthChecks.healthy++;
+          else if (r.status === 'unhealthy') healthChecks.unhealthy++;
+          else healthChecks.unknown++;
+
+          if (r.healthCheck && r.healthCheck !== 'Ninguno' && r.healthCheck !== 'None') {
+            healthChecks.active++;
+          }
+        });
+
+        setStats({
+          totalRecords: records.length,
+          byType: {
+            single: byType.single,
+            multi: byType.multi,
+            weight: byType.weight,
+            roundTrip: byType['round-trip'],
+            geo: byType.geo,
+          },
+          healthChecks,
+        });
+      } catch (err) {
+        console.error('Error cargando datos del dashboard desde dnsService:', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchStats();
+  }, []);
 
   return (
     <div className="dashboard-container">
