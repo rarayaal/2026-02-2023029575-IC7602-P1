@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { dnsService } from '../services/dnsService';
+import CreateRecordModal from '../components/CreateRecordModal';
 
 function DnsRecordsPage() {
   const [records, setRecords] = useState([]);
@@ -7,20 +8,38 @@ function DnsRecordsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [feedback, setFeedback] = useState(null);
+
+  const fetchRecords = async () => {
+    try {
+      const data = await dnsService.getRecords();
+      setRecords(data);
+    } catch (err) {
+      console.error('Error cargando registros DNS:', err);
+      setFeedback({ type: 'error', text: 'Error cargando los registros DNS' });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    async function fetchRecords() {
-      try {
-        const data = await dnsService.getRecords();
-        setRecords(data);
-      } catch (err) {
-        console.error('Error cargando registros DNS:', err);
-      } finally {
-        setLoading(false);
-      }
-    }
     fetchRecords();
   }, []);
+
+  const handleRecordCreated = async (newRecordData) => {
+    const created = await dnsService.createRecord(newRecordData);
+    await fetchRecords();
+    setIsModalOpen(false);
+    setFeedback({
+      type: 'success',
+      text: `Registro DNS (${created.domain} - ${created.id}) creado exitosamente.`,
+    });
+    // Ocultar mensaje automáticamente a los 4 segundos
+    setTimeout(() => {
+      setFeedback(null);
+    }, 4000);
+  };
 
   const filteredRecords = useMemo(() => {
     return records.filter((record) => {
@@ -38,7 +57,26 @@ function DnsRecordsPage() {
           <h2 className="page-title">Gestión de Registros DNS</h2>
           <p className="page-subtitle">Listado completo de registros y su estado de resolución</p>
         </div>
+        <button
+          className="btn-primary"
+          onClick={() => setIsModalOpen(true)}
+        >
+          ➕ Agregar registro
+        </button>
       </header>
+
+      {feedback && (
+        <div className={`feedback-toast ${feedback.type}`}>
+          <span>{feedback.type === 'success' ? '✅' : '⚠️'}</span>
+          <span>{feedback.text}</span>
+          <button
+            className="toast-close"
+            onClick={() => setFeedback(null)}
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {/* Barra de Filtros y Búsqueda */}
       <div className="filters-bar">
@@ -144,8 +182,16 @@ function DnsRecordsPage() {
           </tbody>
         </table>
       </div>
+
+      {/* Modal de Creación */}
+      <CreateRecordModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onRecordCreated={handleRecordCreated}
+      />
     </div>
   );
 }
 
 export default DnsRecordsPage;
+
