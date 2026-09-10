@@ -1,70 +1,35 @@
-import React, { useState, useMemo } from 'react';
-
-// Datos estáticos/simulados para la vista de registros (Commit 4)
-const INITIAL_RECORDS = [
-  {
-    id: 'DNS-001',
-    domain: 'api.company.com',
-    type: 'single',
-    mainInfo: '192.168.1.50',
-    status: 'healthy',
-    healthCheck: 'HTTP GET /health:8080',
-  },
-  {
-    id: 'DNS-002',
-    domain: 'cdn.company.com',
-    type: 'multi',
-    mainInfo: '3 IPs (10.0.0.1, 10.0.0.2, 10.0.0.3)',
-    status: 'healthy',
-    healthCheck: 'TCP:443',
-  },
-  {
-    id: 'DNS-003',
-    domain: 'app.company.com',
-    type: 'weight',
-    mainInfo: '172.16.0.1 (70%) | 172.16.0.2 (30%)',
-    status: 'unhealthy',
-    healthCheck: 'HTTP GET /status:3000',
-  },
-  {
-    id: 'DNS-004',
-    domain: 'edge.company.com',
-    type: 'round-trip',
-    mainInfo: '198.51.100.4 (Lat: 12ms)',
-    status: 'healthy',
-    healthCheck: 'TCP:80',
-  },
-  {
-    id: 'DNS-005',
-    domain: 'portal.company.com',
-    type: 'geo',
-    mainInfo: 'US: 203.0.113.10 | CR: 203.0.113.20',
-    status: 'healthy',
-    healthCheck: 'HTTP GET /ping:80',
-  },
-  {
-    id: 'DNS-006',
-    domain: 'test.company.com',
-    type: 'single',
-    mainInfo: '192.168.1.99',
-    status: 'unknown',
-    healthCheck: 'Ninguno',
-  },
-];
+import React, { useState, useEffect, useMemo } from 'react';
+import { dnsService } from '../services/dnsService';
 
 function DnsRecordsPage() {
+  const [records, setRecords] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
 
+  useEffect(() => {
+    async function fetchRecords() {
+      try {
+        const data = await dnsService.getRecords();
+        setRecords(data);
+      } catch (err) {
+        console.error('Error cargando registros DNS:', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchRecords();
+  }, []);
+
   const filteredRecords = useMemo(() => {
-    return INITIAL_RECORDS.filter((record) => {
+    return records.filter((record) => {
       const matchesSearch = record.domain.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesType = typeFilter === 'all' || record.type === typeFilter;
       const matchesStatus = statusFilter === 'all' || record.status === statusFilter;
       return matchesSearch && matchesType && matchesStatus;
     });
-  }, [searchTerm, typeFilter, statusFilter]);
+  }, [records, searchTerm, typeFilter, statusFilter]);
 
   return (
     <div className="records-page-container">
@@ -130,7 +95,13 @@ function DnsRecordsPage() {
             </tr>
           </thead>
           <tbody>
-            {filteredRecords.length > 0 ? (
+            {loading ? (
+              <tr>
+                <td colSpan="7" className="empty-table-cell">
+                  Cargando registros DNS desde el servicio mock...
+                </td>
+              </tr>
+            ) : filteredRecords.length > 0 ? (
               filteredRecords.map((record) => (
                 <tr key={record.id}>
                   <td className="font-mono text-muted">{record.id}</td>
