@@ -24,7 +24,13 @@ export const dnsService = {
    * Crea un nuevo registro DNS en el estado local
    */
   async createRecord(newRecordData) {
-    const newId = `DNS-${String(recordsState.length + 1).padStart(3, '0')}`;
+    const existingIds = recordsState.map((r) => {
+      const match = r.id && r.id.match(/\d+/);
+      return match ? parseInt(match[0], 10) : 0;
+    });
+    const maxId = existingIds.length > 0 ? Math.max(...existingIds) : 0;
+    const nextNumber = maxId + 1;
+    const newId = `DNS-${String(nextNumber).padStart(3, '0')}`;
     const createdRecord = {
       id: newId,
       status: 'healthy',
