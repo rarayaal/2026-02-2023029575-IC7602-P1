@@ -357,6 +357,13 @@ GET /api/exists?hostname=api.company.com
 Cuando no existe, responde `200` con `"exists": false` y `"type": null`. Se usa `200` y no `404`
 porque "no existe" es una respuesta válida a la pregunta, no un error.
 
+Si falta el parámetro `hostname`, o viene vacío, responde `400` con el código `missing_hostname`.
+
+**El `hostname` de la respuesta viene normalizado**: en minúsculas y sin el punto final. En DNS los
+nombres no distinguen mayúsculas y un nombre absoluto puede terminar en punto, así que
+`EDGE.Company.com.` y `edge.company.com` son el mismo host. El API acepta cualquiera de las dos
+formas y devuelve siempre la canónica, para que quede claro qué fue lo que buscó.
+
 ### `POST /api/dns_resolver` (T-20, lo consume Isaac en T-06)
 
 Recibe un paquete DNS crudo codificado en BASE64, lo resuelve contra un servidor DNS remoto
