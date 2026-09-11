@@ -1,3 +1,5 @@
+fn main() {
+    println!("Hello, world!");
 mod config;
 mod dns;
 mod server;
