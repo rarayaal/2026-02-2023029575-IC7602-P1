@@ -1,6 +1,7 @@
 package dnsapi.http;
 
 import dnsapi.config.ApiConfig;
+import dnsapi.records.DnsRecordRepository;
 import io.javalin.Javalin;
 import io.javalin.http.HttpStatus;
 import java.util.Map;
@@ -23,19 +24,25 @@ public final class ApiServer {
     private final ApiConfig config;
     private final Javalin app;
 
-    public ApiServer(ApiConfig config) {
+    public ApiServer(ApiConfig config, DnsRecordRepository records) {
         this.config = config;
         this.app = Javalin.create(javalin -> {
             javalin.showJavalinBanner = false;
             javalin.jetty.threadPool = new QueuedThreadPool(config.maxThreads());
         });
-        registerRoutes();
+        registerRoutes(records);
     }
 
-    private void registerRoutes() {
+    private void registerRoutes(DnsRecordRepository records) {
         // Endpoint de vida: lo usan Docker Compose y Kubernetes para saber si el contenedor sirve.
         app.get("/api/health", ctx -> ctx.json(Map.of("status", "ok", "component", "dns-api")));
 
+        new ExistsController(records).register(app);
+
+        registerErrorHandlers();
+    }
+
+    private void registerErrorHandlers() {
         // Errores en JSON, para que el DNS Interceptor reciba siempre el mismo formato.
         app.error(HttpStatus.NOT_FOUND.getCode(), ctx ->
                 ctx.json(new ErrorResponse("not_found", "No existe la ruta " + ctx.path())));

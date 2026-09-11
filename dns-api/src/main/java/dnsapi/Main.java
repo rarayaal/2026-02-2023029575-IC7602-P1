@@ -3,6 +3,8 @@ package dnsapi;
 import dnsapi.config.ApiConfig;
 import dnsapi.config.ConfigurationException;
 import dnsapi.http.ApiServer;
+import dnsapi.records.DnsRecordRepository;
+import dnsapi.records.InMemoryDnsRecordRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -16,7 +18,15 @@ public final class Main {
 
     public static void main(String[] args) {
         try {
-            ApiServer server = new ApiServer(ApiConfig.fromEnvironment(System::getenv));
+            ApiConfig config = ApiConfig.fromEnvironment(System::getenv);
+
+            // Temporal: mientras el esquema de datos (T-25) no exista, los registros viven en
+            // memoria. Al cambiar esta linea por la implementacion de Supabase, los endpoints
+            // siguen funcionando sin modificarse.
+            DnsRecordRepository records = InMemoryDnsRecordRepository.withSampleData();
+            log.warn("Usando el repositorio en memoria con datos de ejemplo, no hay base de datos");
+
+            ApiServer server = new ApiServer(config, records);
             // Para que Docker pueda detener el contenedor sin matar peticiones a medio atender.
             Runtime.getRuntime().addShutdownHook(new Thread(server::stop, "dns-api-shutdown"));
             server.start();

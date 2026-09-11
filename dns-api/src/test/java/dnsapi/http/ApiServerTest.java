@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import dnsapi.config.ApiConfig;
+import dnsapi.records.InMemoryDnsRecordRepository;
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -31,7 +32,7 @@ class ApiServerTest {
     @BeforeAll
     static void startServer() {
         // El puerto 0 hace que el sistema operativo asigne uno libre, para no chocar con nada.
-        server = new ApiServer(new ApiConfig("127.0.0.1", 0, 32));
+        server = new ApiServer(new ApiConfig("127.0.0.1", 0, 32), InMemoryDnsRecordRepository.withSampleData());
         server.start();
 
         client = HttpClient.newHttpClient();
