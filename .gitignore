@@ -1,1 +1,10 @@
 .env
+*.env
+!*.env.example
+
+target/
+Cargo.lock
+
+.DS_Store
+
+.vscode/
