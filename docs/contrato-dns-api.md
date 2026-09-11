@@ -8,9 +8,6 @@
 Este documento define cómo se habla con el DNS API. Existe para que la DNS UI, el DNS Interceptor y
 el Health Checker puedan avanzar en paralelo sin esperar a que el API esté implementada.
 
-Si algo aquí no calza con lo que necesita tu componente, hay que discutirlo **antes** de que esté
-programado. Cambiar este documento es barato; cambiar tres componentes ya escritos no lo es.
-
 ---
 
 ## 0. Alcance de este documento
@@ -37,8 +34,6 @@ las completa la persona responsable de esa tarea.
 | Qué campos tiene un registro DNS y qué significa cada uno | **acuerdo de grupo**: los cinco componentes leen y escriben los mismos datos |
 | Cómo se guardan esos datos en la base | **Otto (T-25)** |
 
-Nada de lo que está aquí es definitivo hasta que el equipo lo revise. Si alguna decisión les
-complica el trabajo de su componente, se cambia — para eso se escribe antes de programar.
 
 ---
 
@@ -123,7 +118,7 @@ Esta es la pieza central y la que hay que acordar con cuidado.
 
 Cada tipo necesita datos distintos por IP, pero todos necesitan **una lista de IPs con estado de
 salud individual**. El enunciado lo exige: *"en caso de no existir el registro o que la IP asignada
-se encuentre unhealthy"* — es la IP la que está sana o caída, no el registro completo.
+se encuentre unhealthy"*, es la IP la que está sana o caída, no el registro completo.
 
 Con una sola forma, el Health Checker escribe el estado en un solo lugar, el Interceptor lo lee en
 un solo lugar, y la UI usa una sola tabla con columnas opcionales según el tipo.
@@ -225,8 +220,6 @@ Dos campos que aparecen en los mocks de la UI **no** vienen del API:
 
 Son cadenas de presentación. Si el API las generara, quedaría sabiendo cómo se ve la interfaz, y
 cualquier cambio visual obligaría a tocar el API.
-
-El API manda los datos estructurados. Cómo se presenten es decisión de quien los muestre.
 
 ---
 
@@ -357,6 +350,13 @@ GET /api/exists?hostname=api.company.com
 Cuando no existe, responde `200` con `"exists": false` y `"type": null`. Se usa `200` y no `404`
 porque "no existe" es una respuesta válida a la pregunta, no un error.
 
+Si falta el parámetro `hostname`, o viene vacío, responde `400` con el código `missing_hostname`.
+
+**El `hostname` de la respuesta viene normalizado**: en minúsculas y sin el punto final. En DNS los
+nombres no distinguen mayúsculas y un nombre absoluto puede terminar en punto, así que
+`EDGE.Company.com.` y `edge.company.com` son el mismo host. El API acepta cualquiera de las dos
+formas y devuelve siempre la canónica, para que quede claro qué fue lo que buscó.
+
 ### `POST /api/dns_resolver` (T-20, lo consume Isaac en T-06)
 
 Recibe un paquete DNS crudo codificado en BASE64, lo resuelve contra un servidor DNS remoto
@@ -387,17 +387,3 @@ Compose y Kubernetes; no tiene nada que ver con los health checks de la sección
 > **Pendiente:** los nombres `/api/health` y `/api/health-checks` se parecen demasiado. Propongo
 > renombrar el de vida a `/api/healthz`, que es la convención de Kubernetes.
 
----
-
-## 9. Pendientes del equipo
-
-| # | Tema | Con quién |
-| --- | --- | --- |
-| 1 | Confirmar Supabase o Firebase | todos |
-| 2 | El esquema de datos (T-25) tiene que calzar con este contrato | Otto |
-| 3 | Formato de `id`: lo genera la base de datos, la UI no debe asumir `DNS-001` | Alexandra, Otto |
-| 4 | Cómo lee el Health Checker las credenciales de `basicAuth` | Otto |
-| 5 | HTTPS y certificados entre Interceptor y API | Isaac |
-| 6 | CORS para el origen de la UI | Luis |
-| 7 | Renombrar `/api/health` a `/api/healthz` | todos |
-| 8 | Numerar como tarea nueva el CRUD de health checks de la sección 6 | Luis |
