@@ -1,4 +1,5 @@
 use super::header::{DnsHeader, DnsParseError, HEADER_SIZE};
+use super::question::Question;
 
 /// Clasificación de un paquete DNS entrante, según el criterio definido en el enunciado del proyecto.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -37,10 +38,14 @@ impl DnsMessage {
     }
 
     /// Bytes posteriores al header, donde empieza la sección Question (RFC1035 §4.1.2).
-    // Se usa a partir de la Fase 3 para extraer el hostname; por ahora solo lo leen los tests.
-    #[allow(dead_code)]
     pub fn body(&self) -> &[u8] {
         &self.raw[HEADER_SIZE..]
+    }
+
+    /// Parsea la primera Question del mensaje (hostname + QTYPE + QCLASS). Se parsean aqui los estandar
+    /// los no estándar se reenvían crudos al DNS API.
+    pub fn question(&self) -> Result<Question, DnsParseError> {
+        Question::parse(self.body())
     }
 }
 

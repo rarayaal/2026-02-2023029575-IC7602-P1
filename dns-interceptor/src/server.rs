@@ -5,7 +5,7 @@ use tokio::net::UdpSocket;
 use tracing::{info, warn};
 
 use crate::config::Config;
-use crate::dns::DnsMessage;
+use crate::dns::{DnsMessage, PacketKind};
 
 /// Tamaño clásico máximo de un mensaje DNS sobre UDP sin EDNS0 (RFC1035 sección 4.2.1).
 /// Paquetes más grandes se fragmentan (todavía no implementado).
@@ -41,23 +41,32 @@ pub async fn run(config: Config) -> std::io::Result<()> {
     }
 }
 
-/// Procesa un único paquete: parsea el header y lo clasifica.
-/// La extracción del hostname y el envío de una respuesta real llegan en fases siguientes.
+/// Procesa un único paquete: parsea el header, lo clasifica y, si es un query estándar, extrae
+/// el hostname. Por ahora no se hace un envio "real".
 async fn handle_packet(packet: Vec<u8>, client_addr: SocketAddr, _socket: Arc<UdpSocket>) {
     match DnsMessage::parse(packet) {
         Ok(message) => {
             let kind = message.classify();
-            info!(
-                "Paquete de {client_addr}: id={:#06x} qr={} opcode={} rd={} qdcount={} -> {:?}",
-                message.header.id,
-                message.header.qr,
-                message.header.opcode,
-                message.header.rd,
-                message.header.qdcount,
-                kind
-            );
+
+            match kind {
+                // Solo los query estándar se resuelven localmente, el resto se delega
+                // íntegro al DNS API, sin necesidad de leer su contenido.
+                PacketKind::StandardQuery => match message.question() {
+                    Ok(question) => info!(
+                        "Paquete de {client_addr}: id={:#06x} qname={} qtype={} qclass={} -> {:?}",
+                        message.header.id, question.qname, question.qtype, question.qclass, kind
+                    ),
+                    Err(e) => warn!(
+                        "Paquete de {client_addr} clasificado como {kind:?} pero con Question inválida: {e:?}"
+                    ),
+                },
+                PacketKind::NonStandard => info!(
+                    "Paquete de {client_addr}: id={:#06x} opcode={} -> {:?}",
+                    message.header.id, message.header.opcode, kind
+                ),
+            }
         }
-        // Un header inválido no bota el servidos, solo se decarta.
+        // Un header inválido no bota el servidor, solo se descarta el paquete.
         Err(e) => {
             warn!("Paquete de {client_addr} descartado, header inválido: {e:?}");
         }

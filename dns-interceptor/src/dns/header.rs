@@ -1,16 +1,18 @@
-/// Tamaño fijo del header DNS: 12 bytes (segun RFC1035 §4.1.1).
+/// Tamaño fijo del header DNS: 12 bytes (segun RFC1035).
 pub const HEADER_SIZE: usize = 12;
 
-/// Errores posibles al parsear un mensaje DNS. Se amplía en fases futuras (Question, Answer, etc.).
+/// Errores posibles al parsear un mensaje DNS.
 #[derive(Debug, PartialEq, Eq)]
 pub enum DnsParseError {
-    /// El paquete no alcanza los 12 bytes mínimos del header.
+    /// El paquete no alcanza los bytes mínimos esperados para la sección que se está parseando.
     TooShort,
+    /// Byte de longitud de label con los bits 0xC0 en 1
+    UnsupportedNamePointer,
 }
 
 /// Header de 12 bytes de un mensaje DNS (RFC1035 §4.1.1 / RFC2929).
 ///
-/// Layout de los dos bytes de flags (bytes 2 y 3, después del ID):
+/// Layout de los dos bytes de flags:
 /// ```text
 /// byte 2: QR(1) OPCODE(4) AA(1) TC(1) RD(1)
 /// byte 3: RA(1) Z(3)      RCODE(4)

@@ -1,8 +1,9 @@
 pub mod header;
 pub mod message;
+pub mod question;
 
-// Re-exportados para las fases siguientes del Interceptor.
 #[allow(unused_imports)]
 pub use header::DnsHeader;
-#[allow(unused_imports)]
 pub use message::{DnsMessage, PacketKind};
+#[allow(unused_imports)]
+pub use question::Question;
