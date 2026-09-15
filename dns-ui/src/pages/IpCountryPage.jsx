@@ -9,6 +9,7 @@ function IpCountryPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingMapping, setEditingMapping] = useState(null);
   const [deletingMapping, setDeletingMapping] = useState(null);
+  const [viewingMapping, setViewingMapping] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [feedback, setFeedback] = useState(null);
 
@@ -92,8 +93,8 @@ function IpCountryPage() {
       return (
         m.countryName.toLowerCase().includes(search) ||
         m.countryCode.toLowerCase().includes(search) ||
-        m.ipRange.toLowerCase().includes(search) ||
-        m.description.toLowerCase().includes(search)
+        (m.ipRange && m.ipRange.toLowerCase().includes(search)) ||
+        (m.description && m.description.toLowerCase().includes(search))
       );
     });
   }, [mappings, searchTerm]);
@@ -164,15 +165,19 @@ function IpCountryPage() {
               filteredMappings.map((m) => (
                 <tr key={m.id}>
                   <td className="font-mono text-muted">{m.id}</td>
-                  <td className="font-mono font-semibold">{m.ipRange}</td>
+                  <td className="font-mono font-semibold">{m.ipRange || `${m.ipStart} - ${m.ipEnd}`}</td>
                   <td>
                     <span className="type-badge geo">{m.countryCode}</span>
                   </td>
                   <td className="font-semibold">{m.countryName}</td>
-                  <td className="text-muted main-info-cell">{m.description}</td>
+                  <td className="text-muted main-info-cell">{m.description || 'Rango de subred asignado'}</td>
                   <td>
                     <div className="actions-cell">
-                      <button className="btn-icon view" title="Ver detalle (Visual)">
+                      <button
+                        className="btn-icon view"
+                        title="Ver detalle del mapeo"
+                        onClick={() => setViewingMapping(m)}
+                      >
                         👁️
                       </button>
                       <button
@@ -216,6 +221,62 @@ function IpCountryPage() {
         initialData={editingMapping}
       />
 
+      {/* Modal de Visualización Detallada (Boton Ojo 👁️) */}
+      {viewingMapping && (
+        <div className="modal-overlay" onClick={() => setViewingMapping(null)}>
+          <div className="modal-container" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '600px' }}>
+            <div className="modal-header">
+              <h3 className="modal-title">👁️ Detalle del Mapeo IP-Country ({viewingMapping.id})</h3>
+              <button className="modal-close-btn" onClick={() => setViewingMapping(null)}>
+                ✕
+              </button>
+            </div>
+
+            <div style={{ margin: '1rem 0', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', background: 'var(--bg-dark)', padding: '1rem', borderRadius: '0.5rem', border: '1px solid var(--border-color)' }}>
+                <div>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block' }}>País:</span>
+                  <strong style={{ fontSize: '1.05rem', color: 'var(--text-main)' }}>{viewingMapping.countryName}</strong>
+                </div>
+                <div>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block' }}>Código ISO:</span>
+                  <span className="type-badge geo">{viewingMapping.countryCode}</span>
+                </div>
+                <div>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block' }}>Rango / Subred IP:</span>
+                  <span className="font-mono font-semibold">{viewingMapping.ipRange || `${viewingMapping.ipStart} - ${viewingMapping.ipEnd}`}</span>
+                </div>
+                {viewingMapping.city && (
+                  <div>
+                    <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block' }}>Ciudad:</span>
+                    <span>{viewingMapping.city}</span>
+                  </div>
+                )}
+                {viewingMapping.latitude && (
+                  <div>
+                    <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block' }}>Coordenadas:</span>
+                    <span className="font-mono">{viewingMapping.latitude}, {viewingMapping.longitude}</span>
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <h4 style={{ fontSize: '0.85rem', marginBottom: '0.25rem', color: 'var(--text-muted)' }}>Payload JSON (Contrato DNS API):</h4>
+                <pre style={{ background: '#090d16', padding: '0.75rem', borderRadius: '0.5rem', fontSize: '0.8rem', color: '#38bdf8', overflowX: 'auto', border: '1px solid var(--border-color)' }}>
+                  {JSON.stringify(viewingMapping, null, 2)}
+                </pre>
+              </div>
+            </div>
+
+            <div className="modal-footer">
+              <button type="button" className="btn-secondary" onClick={() => setViewingMapping(null)}>
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Modal de Confirmación de Eliminación */}
       {deletingMapping && (
         <div className="modal-overlay" onClick={() => setDeletingMapping(null)}>
@@ -231,7 +292,7 @@ function IpCountryPage() {
               <p>¿Está seguro de que desea eliminar el siguiente mapeo IP-to-Country?</p>
               <div style={{ background: 'var(--bg-dark)', border: '1px solid var(--border-color)', padding: '1rem', borderRadius: '0.5rem', marginTop: '0.75rem' }}>
                 <p style={{ fontWeight: 600, color: 'var(--text-main)' }}>País: {deletingMapping.countryName} ({deletingMapping.countryCode})</p>
-                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>ID: {deletingMapping.id} | Rango: {deletingMapping.ipRange}</p>
+                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>ID: {deletingMapping.id} | Rango: {deletingMapping.ipRange || `${deletingMapping.ipStart} - ${deletingMapping.ipEnd}`}</p>
               </div>
               <p style={{ fontSize: '0.85rem', color: '#f87171', marginTop: '0.75rem' }}>
                 Esta acción eliminará la asociación local y no se puede deshacer.

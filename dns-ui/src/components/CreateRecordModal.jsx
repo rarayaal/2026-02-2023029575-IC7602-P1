@@ -12,7 +12,6 @@ function CreateRecordModal({
   const [type, setType] = useState('single');
   const [domain, setDomain] = useState('');
   const [ttl, setTtl] = useState(300);
-  const [healthCheck, setHealthCheck] = useState('');
 
   // Campos para Single
   const [singleIp, setSingleIp] = useState('');
@@ -26,12 +25,12 @@ function CreateRecordModal({
     { ip: '', weight: 30 },
   ]);
 
-  // Campos para Round-Trip
+  // Campos para Round-Trip (En creación/edición solo se ingresan las IPs de destino)
   const [roundTripItems, setRoundTripItems] = useState([
-    { ip: '', location: 'us-east', latencyMs: 12 },
+    { ip: '' },
   ]);
 
-  // Campos para Geo
+  // Campos para Geo (País IP)
   const [geoMappings, setGeoMappings] = useState([
     { country: 'US', ip: '' },
     { country: 'CR', ip: '' },
@@ -44,14 +43,13 @@ function CreateRecordModal({
     setType('single');
     setDomain('');
     setTtl(300);
-    setHealthCheck('');
     setSingleIp('');
     setMultiIps('');
     setWeightItems([
       { ip: '', weight: 70 },
       { ip: '', weight: 30 },
     ]);
-    setRoundTripItems([{ ip: '', location: 'us-east', latencyMs: 12 }]);
+    setRoundTripItems([{ ip: '' }]);
     setGeoMappings([
       { country: 'US', ip: '' },
       { country: 'CR', ip: '' },
@@ -62,42 +60,38 @@ function CreateRecordModal({
   useEffect(() => {
     if (isOpen) {
       if (initialData) {
-        // Cargar datos existentes para Modo Edición
+        // Cargar datos existentes para Modo Edición usando targets según contrato
         setType(initialData.type || 'single');
         setDomain(initialData.domain || '');
         setTtl(initialData.ttl || 300);
-        setHealthCheck(
-          initialData.healthCheck === 'Ninguno' ? '' : initialData.healthCheck || ''
-        );
 
-        const val = initialData.value || {};
+        const targets = Array.isArray(initialData.targets) ? initialData.targets : [];
+
         if (initialData.type === 'single') {
-          setSingleIp(val.ip || initialData.mainInfo || '');
+          setSingleIp(targets[0]?.ip || '');
         } else if (initialData.type === 'multi') {
-          setMultiIps(Array.isArray(val.ips) ? val.ips.join(', ') : '');
+          setMultiIps(targets.map((t) => t.ip).filter(Boolean).join(', '));
         } else if (initialData.type === 'weight') {
           setWeightItems(
-            Array.isArray(val.items) && val.items.length > 0
-              ? val.items.map((i) => ({
-                  ip: i.ip || '',
-                  weight: i.weight !== undefined ? i.weight : 50,
+            targets.length > 0
+              ? targets.map((t) => ({
+                  ip: t.ip || '',
+                  weight: t.weight !== undefined ? t.weight : 50,
                 }))
               : [{ ip: '', weight: 70 }, { ip: '', weight: 30 }]
           );
         } else if (initialData.type === 'round-trip') {
           setRoundTripItems(
-            Array.isArray(val.items) && val.items.length > 0
-              ? val.items.map((i) => ({
-                  ip: i.ip || '',
-                  location: i.location || '',
-                  latencyMs: i.latencyMs !== undefined ? i.latencyMs : 10,
+            targets.length > 0
+              ? targets.map((t) => ({
+                  ip: t.ip || '',
                 }))
-              : [{ ip: '', location: 'us-east', latencyMs: 12 }]
+              : [{ ip: '' }]
           );
         } else if (initialData.type === 'geo') {
           setGeoMappings(
-            Array.isArray(val.mappings) && val.mappings.length > 0
-              ? val.mappings.map((m) => ({ country: m.country || '', ip: m.ip || '' }))
+            targets.length > 0
+              ? targets.map((t) => ({ country: t.country || '', ip: t.ip || '' }))
               : [
                   { country: 'US', ip: '' },
                   { country: 'CR', ip: '' },
@@ -106,7 +100,6 @@ function CreateRecordModal({
         }
         setError('');
       } else {
-        // Modo Creación
         resetForm();
       }
     }
@@ -130,7 +123,7 @@ function CreateRecordModal({
   };
 
   const handleAddRoundTripItem = () => {
-    setRoundTripItems([...roundTripItems, { ip: '', location: '', latencyMs: 10 }]);
+    setRoundTripItems([...roundTripItems, { ip: '' }]);
   };
   const handleRemoveRoundTripItem = (index) => {
     if (roundTripItems.length > 1) {
@@ -151,7 +144,6 @@ function CreateRecordModal({
     e.preventDefault();
     setError('');
 
-    // Validaciones comunes
     if (!domain.trim()) {
       setError('El nombre de dominio es obligatorio.');
       return;
@@ -161,17 +153,14 @@ function CreateRecordModal({
       return;
     }
 
-    let value = {};
-    let mainInfo = '';
+    let targets = [];
 
-    // Validaciones y estructuración por tipo
     if (type === 'single') {
       if (!singleIp.trim()) {
         setError('Debe ingresar una dirección IP para el registro Single.');
         return;
       }
-      value = { ip: singleIp.trim() };
-      mainInfo = singleIp.trim();
+      targets = [{ ip: singleIp.trim() }];
     } else if (type === 'multi') {
       const ips = multiIps
         .split(',')
@@ -181,39 +170,27 @@ function CreateRecordModal({
         setError('Debe ingresar al menos una dirección IP (separadas por comas).');
         return;
       }
-      value = { ips };
-      mainInfo = `${ips.length} IPs (${ips.join(', ')})`;
+      targets = ips.map((ip) => ({ ip }));
     } else if (type === 'weight') {
       const validItems = weightItems.filter((item) => item.ip.trim());
       if (validItems.length === 0) {
-        setError('Debe ingresar al menos un elemento IP/Peso válido.');
+        setError('Debe ingresar al menos una IP con su peso correspondiente.');
         return;
       }
-      value = {
-        items: validItems.map((item) => ({
-          ip: item.ip.trim(),
-          weight: Number(item.weight) || 0,
-        })),
-      };
-      mainInfo = validItems
-        .map((item) => `${item.ip.trim()} (${item.weight}%)`)
-        .join(' | ');
+      targets = validItems.map((item) => ({
+        ip: item.ip.trim(),
+        weight: Number(item.weight) || 0,
+      }));
     } else if (type === 'round-trip') {
       const validItems = roundTripItems.filter((item) => item.ip.trim());
       if (validItems.length === 0) {
-        setError('Debe ingresar al menos una IP/servidor para Round-Trip.');
+        setError('Debe ingresar al menos una IP para Round-Trip.');
         return;
       }
-      value = {
-        items: validItems.map((item) => ({
-          ip: item.ip.trim(),
-          location: item.location.trim() || 'default',
-          latencyMs: Number(item.latencyMs) || 0,
-        })),
-      };
-      mainInfo = validItems
-        .map((item) => `${item.ip.trim()} (Lat: ${item.latencyMs || 0}ms)`)
-        .join(' | ');
+      // Nota: En round-trip no se envían ni declaran métricas de latencia al crear/editar
+      targets = validItems.map((item) => ({
+        ip: item.ip.trim(),
+      }));
     } else if (type === 'geo') {
       const validMappings = geoMappings.filter(
         (m) => m.country.trim() && m.ip.trim()
@@ -222,24 +199,18 @@ function CreateRecordModal({
         setError('Debe ingresar al menos un mapeo País-IP válido.');
         return;
       }
-      value = {
-        mappings: validMappings.map((m) => ({
-          country: m.country.trim().toUpperCase(),
-          ip: m.ip.trim(),
-        })),
-      };
-      mainInfo = validMappings
-        .map((m) => `${m.country.trim().toUpperCase()}: ${m.ip.trim()}`)
-        .join(' | ');
+      targets = validMappings.map((m) => ({
+        ip: m.ip.trim(),
+        country: m.country.trim().toUpperCase(),
+      }));
     }
 
+    // Payload de envío al contrato: domain, type, ttl, targets (SIN id, status, mainInfo ni healthCheck)
     const recordData = {
       domain: domain.trim(),
       type,
       ttl: Number(ttl),
-      value,
-      mainInfo,
-      healthCheck: healthCheck.trim() || 'Ninguno',
+      targets,
     };
 
     setIsSubmitting(true);
@@ -247,10 +218,7 @@ function CreateRecordModal({
       if (isEditMode) {
         await onRecordUpdated(initialData.id, recordData);
       } else {
-        await onRecordCreated({
-          ...recordData,
-          status: 'healthy',
-        });
+        await onRecordCreated(recordData);
       }
       resetForm();
     } catch (err) {
@@ -318,26 +286,15 @@ function CreateRecordModal({
             </div>
           </div>
 
-          <div className="form-group">
-            <label className="form-label">Health Check (Opcional)</label>
-            <input
-              type="text"
-              placeholder="ej. TCP:80 o HTTP GET /health:8080"
-              value={healthCheck}
-              onChange={(e) => setHealthCheck(e.target.value)}
-              className="form-input"
-            />
-          </div>
-
-          {/* Campos específicos por Tipo */}
+          {/* Campos específicos por Tipo (configuración de targets) */}
           <div className="type-fields-section">
             <h4 className="fields-section-title">
-              Configuración Específica: <span className="highlight">{type.toUpperCase()}</span>
+              Configuración de Targets: <span className="highlight">{type.toUpperCase()}</span>
             </h4>
 
             {type === 'single' && (
               <div className="form-group">
-                <label className="form-label">Dirección IP *</label>
+                <label className="form-label">Dirección IP de Target *</label>
                 <input
                   type="text"
                   placeholder="ej. 192.168.1.50"
@@ -350,7 +307,7 @@ function CreateRecordModal({
 
             {type === 'multi' && (
               <div className="form-group">
-                <label className="form-label">Lista de IPs (separadas por coma) *</label>
+                <label className="form-label">Lista de IPs Target (separadas por coma) *</label>
                 <input
                   type="text"
                   placeholder="ej. 10.0.0.1, 10.0.0.2, 10.0.0.3"
@@ -364,7 +321,7 @@ function CreateRecordModal({
 
             {type === 'weight' && (
               <div className="dynamic-list-group">
-                <label className="form-label">Servidores e Intensidad / Peso *</label>
+                <label className="form-label">Targets IP y Peso (%) *</label>
                 {weightItems.map((item, index) => (
                   <div key={index} className="dynamic-row">
                     <input
@@ -380,9 +337,8 @@ function CreateRecordModal({
                     />
                     <input
                       type="number"
-                      placeholder="Peso %"
+                      placeholder="Peso"
                       min="1"
-                      max="100"
                       value={item.weight}
                       onChange={(e) => {
                         const newItems = [...weightItems];
@@ -408,19 +364,19 @@ function CreateRecordModal({
                   onClick={handleAddWeightItem}
                   className="btn-add-row"
                 >
-                  ➕ Agregar Servidor / Peso
+                  ➕ Agregar Target / Peso
                 </button>
               </div>
             )}
 
             {type === 'round-trip' && (
               <div className="dynamic-list-group">
-                <label className="form-label">Servidores, Ubicación y Latencia *</label>
+                <label className="form-label">Direcciones IP Target *</label>
                 {roundTripItems.map((item, index) => (
                   <div key={index} className="dynamic-row">
                     <input
                       type="text"
-                      placeholder="IP"
+                      placeholder="IP ej. 198.51.100.4"
                       value={item.ip}
                       onChange={(e) => {
                         const newItems = [...roundTripItems];
@@ -428,29 +384,6 @@ function CreateRecordModal({
                         setRoundTripItems(newItems);
                       }}
                       className="form-input flex-2"
-                    />
-                    <input
-                      type="text"
-                      placeholder="Ubicación (ej. us-east)"
-                      value={item.location}
-                      onChange={(e) => {
-                        const newItems = [...roundTripItems];
-                        newItems[index].location = e.target.value;
-                        setRoundTripItems(newItems);
-                      }}
-                      className="form-input flex-2"
-                    />
-                    <input
-                      type="number"
-                      placeholder="Lat ms"
-                      min="1"
-                      value={item.latencyMs}
-                      onChange={(e) => {
-                        const newItems = [...roundTripItems];
-                        newItems[index].latencyMs = e.target.value;
-                        setRoundTripItems(newItems);
-                      }}
-                      className="form-input flex-1"
                     />
                     {roundTripItems.length > 1 && (
                       <button
@@ -469,19 +402,22 @@ function CreateRecordModal({
                   onClick={handleAddRoundTripItem}
                   className="btn-add-row"
                 >
-                  ➕ Agregar Servidor / Latencia
+                  ➕ Agregar Target IP
                 </button>
+                <span className="form-hint" style={{ marginTop: '0.5rem', display: 'block' }}>
+                  Las mediciones de RTT (latencia en ms) son calculadas automáticamente por los Health Checkers.
+                </span>
               </div>
             )}
 
             {type === 'geo' && (
               <div className="dynamic-list-group">
-                <label className="form-label">Mapeos de País a Dirección IP *</label>
+                <label className="form-label">Targets por Ubicación Geográfica (País - IP) *</label>
                 {geoMappings.map((item, index) => (
                   <div key={index} className="dynamic-row">
                     <input
                       type="text"
-                      placeholder="País (ej. US, CR, ES)"
+                      placeholder="País ISO (ej. US, CR)"
                       value={item.country}
                       onChange={(e) => {
                         const newMappings = [...geoMappings];
@@ -518,7 +454,7 @@ function CreateRecordModal({
                   onClick={handleAddGeoMapping}
                   className="btn-add-row"
                 >
-                  ➕ Agregar Mapeo País-IP
+                  ➕ Agregar Target País-IP
                 </button>
               </div>
             )}
