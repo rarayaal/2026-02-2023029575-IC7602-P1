@@ -198,9 +198,9 @@ function HealthChecksPage() {
                       {check.protocol || check.type}
                     </span>
                   </td>
-                  <td className="main-info-cell font-mono">{check.target || `${check.protocol} ${check.port}`}</td>
+                  <td className="main-info-cell font-mono">{check.target || `${check.protocol || check.type} ${check.port}`}</td>
                   <td className="text-muted">
-                    {check.intervalSeconds || check.intervalSec || 30}s / {check.timeoutMs ? `${check.timeoutMs}ms` : `${check.timeoutSec || 5}s`}
+                    {check.intervalSeconds || 30}s / {check.timeoutMs ? `${check.timeoutMs}ms` : '5000ms'}
                   </td>
                   <td>
                     <span className={`status-badge ${check.status || 'unknown'}`}>
@@ -262,7 +262,7 @@ function HealthChecksPage() {
       {/* Modal de Visualización Detallada (Boton Ojo 👁️) */}
       {viewingCheck && (
         <div className="modal-overlay" onClick={() => setViewingCheck(null)}>
-          <div className="modal-container" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '600px' }}>
+          <div className="modal-container" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '640px' }}>
             <div className="modal-header">
               <h3 className="modal-title">👁️ Detalle del Health Check ({viewingCheck.id})</h3>
               <button className="modal-close-btn" onClick={() => setViewingCheck(null)}>
@@ -283,15 +283,19 @@ function HealthChecksPage() {
                   </span>
                 </div>
                 <div>
-                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block' }}>Target IP ID:</span>
-                  <span className="font-mono text-muted">{viewingCheck.targetId || 'N/A'}</span>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block' }}>Host / IP:</span>
+                  <span className="font-mono">{viewingCheck.host || viewingCheck.ip || 'N/A'}</span>
                 </div>
                 <div>
                   <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block' }}>Puerto:</span>
                   <span className="font-mono">{viewingCheck.port}</span>
                 </div>
-                {viewingCheck.protocol === 'HTTP' && (
+                {(viewingCheck.protocol || viewingCheck.type) === 'HTTP' && (
                   <>
+                    <div>
+                      <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block' }}>Método HTTP:</span>
+                      <span className="font-mono">{viewingCheck.method || 'GET'}</span>
+                    </div>
                     <div>
                       <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block' }}>Ruta / Path:</span>
                       <span className="font-mono">{viewingCheck.path || '/'}</span>
@@ -300,30 +304,37 @@ function HealthChecksPage() {
                       <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block' }}>Códigos Esperados:</span>
                       <span className="font-mono">{JSON.stringify(viewingCheck.expectedStatuses || [200])}</span>
                     </div>
+                    <div>
+                      <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block' }}>Basic Auth:</span>
+                      <span className="font-mono text-muted">
+                        {viewingCheck.basicAuth ? `user: ${viewingCheck.basicAuth.username}` : 'Desactivado'}
+                      </span>
+                    </div>
                   </>
                 )}
                 <div>
                   <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block' }}>Intervalo:</span>
-                  <span className="font-mono">{viewingCheck.intervalSeconds || viewingCheck.intervalSec || 30}s</span>
+                  <span className="font-mono">{viewingCheck.intervalSeconds || 30}s</span>
                 </div>
                 <div>
                   <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block' }}>Timeout:</span>
-                  <span className="font-mono">{viewingCheck.timeoutMs ? `${viewingCheck.timeoutMs}ms` : `${viewingCheck.timeoutSec || 5}s`}</span>
+                  <span className="font-mono">{viewingCheck.timeoutMs ? `${viewingCheck.timeoutMs}ms` : '5000ms'}</span>
                 </div>
                 <div>
                   <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block' }}>Reintentos (Retries):</span>
                   <span className="font-mono">{viewingCheck.retries ?? 3}</span>
                 </div>
                 <div>
-                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block' }}>Basic Auth:</span>
-                  <span className="font-mono text-muted">
-                    {viewingCheck.basicAuth ? `user: ${viewingCheck.basicAuth.username} (pass: null [solo lectura])` : 'No configurado'}
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block' }}>Estado:</span>
+                  <span className={`status-badge ${viewingCheck.status || 'unknown'}`}>
+                    <span className="status-dot-sm"></span>
+                    {viewingCheck.status || 'unknown'}
                   </span>
                 </div>
               </div>
 
               <div>
-                <h4 style={{ fontSize: '0.85rem', marginBottom: '0.25rem', color: 'var(--text-muted)' }}>Payload JSON (Contrato DNS API):</h4>
+                <h4 style={{ fontSize: '0.85rem', marginBottom: '0.25rem', color: 'var(--text-muted)' }}>Payload JSON (Modelo DNS API):</h4>
                 <pre style={{ background: '#090d16', padding: '0.75rem', borderRadius: '0.5rem', fontSize: '0.8rem', color: '#38bdf8', overflowX: 'auto', border: '1px solid var(--border-color)' }}>
                   {JSON.stringify(viewingCheck, null, 2)}
                 </pre>
