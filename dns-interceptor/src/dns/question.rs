@@ -1,24 +1,21 @@
-use super::header::DnsParseError;
+use super::header::{DnsParseError, ErrorParseoDns, TAMANO_ENCABEZADO};
 
 /// Sección Question de un mensaje DNS (RFC1035): nombre solicitado + tipo + clase.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Question {
-    /// Hostname en formato legible, reconstruido a partir de los labels.
     pub qname: String,
+    pub nombre_host: String,
     pub qtype: u16,
+    pub tipo_consulta: u16,
     pub qclass: u16,
-    /// Cuántos bytes ocupó esta Question.
+    pub clase_consulta: u16,
     pub consumed: usize,
+    pub offset_final: usize,
 }
 
+pub type PreguntaDns = Question;
+
 impl Question {
-    /// Parsea la primera sección Question a partir de los bytes posteriores al header
-    /// (`DnsMessage::body()`).
-    ///
-    /// Un nombre DNS es una secuencia de labels `[longitud][bytes...]` terminada en un byte de
-    /// longitud 0 (root). No se soportan punteros de compresión aquí: en la Question de un query
-    /// entrante no tendría sentido que apunten hacia atrás (caerían dentro del header), así que se
-    /// devuelve error en vez de intentar resolverlos.
     pub fn parse(body: &[u8]) -> Result<Self, DnsParseError> {
         let mut labels = Vec::new();
         let mut offset = 0;
@@ -31,7 +28,6 @@ impl Question {
                 break;
             }
 
-            // 0xC0 en los dos bits altos = puntero de compresión (o forma reservada); no soportado.
             if len_byte & 0b1100_0000 != 0 {
                 return Err(DnsParseError::UnsupportedNamePointer);
             }
@@ -41,9 +37,11 @@ impl Question {
             let label_bytes = body
                 .get(offset..offset + label_len)
                 .ok_or(DnsParseError::TooShort)?;
+            let label = std::str::from_utf8(label_bytes)
+                .map_err(|_| DnsParseError::InvalidQuestion)?
+                .to_lowercase();
 
-            // Suficiente para hostnames típicos (ASCII); DNS internacionalizado usa Punycode ASCII.
-            labels.push(String::from_utf8_lossy(label_bytes).to_string());
+            labels.push(label);
             offset += label_len;
         }
 
@@ -52,11 +50,32 @@ impl Question {
         let qclass = u16::from_be_bytes([qtype_qclass[2], qtype_qclass[3]]);
         offset += 4;
 
+        let qname = labels.join(".");
+
         Ok(Self {
-            qname: labels.join("."),
+            qname: qname.clone(),
+            nombre_host: qname,
             qtype,
+            tipo_consulta: qtype,
             qclass,
+            clase_consulta: qclass,
             consumed: offset,
+            offset_final: offset,
+        })
+    }
+
+    pub fn parsear(bytes: &[u8]) -> Result<Self, ErrorParseoDns> {
+        if bytes.len() <= TAMANO_ENCABEZADO {
+            return Err(ErrorParseoDns::DemasiadoCorto);
+        }
+
+        let pregunta = Self::parse(&bytes[TAMANO_ENCABEZADO..])?;
+        Ok(Self {
+            offset_final: TAMANO_ENCABEZADO + pregunta.consumed,
+            ..pregunta
+        })
+    }
+}
         })
     }
 }
@@ -65,9 +84,8 @@ impl Question {
 mod tests {
     use super::*;
 
-    /// Codifica una Question a mano: labels con su byte de longitud + terminador 0 + QTYPE/QCLASS.
     fn encode_question(labels: &[&str], qtype: u16, qclass: u16) -> Vec<u8> {
-        let mut bytes = Vec::new();
+        let mut bytes = vec![0; TAMANO_ENCABEZADO];
         for label in labels {
             bytes.push(label.len() as u8);
             bytes.extend_from_slice(label.as_bytes());
@@ -79,41 +97,46 @@ mod tests {
     }
 
     #[test]
-    fn parsea_hostname_simple() {
-        let body = encode_question(&["example", "com"], 1, 1);
-        let q = Question::parse(&body).unwrap();
-        assert_eq!(q.qname, "example.com");
-        assert_eq!(q.qtype, 1); // A
-        assert_eq!(q.qclass, 1); // IN
-        assert_eq!(q.consumed, body.len());
+    fn parsea_qname_valido() {
+        let bytes = encode_question(&["app", "company", "com"], 1, 1);
+
+        let q = PreguntaDns::parsear(&bytes).unwrap();
+        assert_eq!(q.nombre_host, "app.company.com");
+        assert_eq!(q.qname, "app.company.com");
+        assert_eq!(q.tipo_consulta, 1);
+        assert_eq!(q.clase_consulta, 1);
+        assert_eq!(q.offset_final, bytes.len());
     }
 
     #[test]
-    fn parsea_hostname_con_varios_subdominios() {
-        let body = encode_question(&["www", "sub", "example", "com"], 28, 1);
-        let q = Question::parse(&body).unwrap();
-        assert_eq!(q.qname, "www.sub.example.com");
-        assert_eq!(q.qtype, 28); // AAAA
+    fn parsea_body_desde_question() {
+        let packet = encode_question(&["example", "com"], 28, 1);
+        let q = Question::parse(&packet[TAMANO_ENCABEZADO..]).unwrap();
+        assert_eq!(q.qname, "example.com");
+        assert_eq!(q.qtype, 28);
+        assert_eq!(q.consumed, packet.len() - TAMANO_ENCABEZADO);
     }
 
     #[test]
     fn rechaza_puntero_de_compresion() {
-        let body = [0xC0, 0x0C, 0x00, 0x01, 0x00, 0x01];
+        let mut bytes = vec![0; TAMANO_ENCABEZADO];
+        bytes.extend_from_slice(&[0xC0, 0x0C, 0x00, 0x01, 0x00, 0x01]);
+
         assert_eq!(
-            Question::parse(&body),
-            Err(DnsParseError::UnsupportedNamePointer)
+            PreguntaDns::parsear(&bytes),
+            Err(ErrorParseoDns::PunteroNombreNoSoportado)
         );
     }
 
     #[test]
-    fn rechaza_paquete_truncado_en_medio_de_un_label() {
-        let body = [0x07, b'e', b'x']; // dice longitud 7 pero solo hay 2 bytes disponibles
-        assert_eq!(Question::parse(&body), Err(DnsParseError::TooShort));
-    }
+    fn rechaza_paquete_truncado() {
+        let mut bytes = vec![0; TAMANO_ENCABEZADO];
+        bytes.extend_from_slice(&[0x07, b'e', b'x']);
 
-    #[test]
-    fn rechaza_paquete_sin_qtype_ni_qclass() {
-        let body = [0x00]; // nombre raíz (root) pero sin los 4 bytes de QTYPE/QCLASS
-        assert_eq!(Question::parse(&body), Err(DnsParseError::TooShort));
+        assert_eq!(
+            PreguntaDns::parsear(&bytes),
+            Err(ErrorParseoDns::DemasiadoCorto)
+        );
+    }
     }
 }

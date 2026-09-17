@@ -1,1 +1,14 @@
 .env
+*.env
+!*.env.example
+
+target/
+Cargo.lock
+
+.DS_Store
+
+.vscode/
+node_modules/
+dist/
+*.local
+.DS_Store
