@@ -1,0 +1,57 @@
+version: "3.8"
+
+services:
+  # Mock del DNS API
+  mock-dns-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ./mock_dns_api
+    ports:
+      - "8081:8081"
+    environment:
+      MOCK_API_PORT: "8081"
+    # Por defecto no expone el servicio fuera del compose 
+
+  # Servidor DNS Interceptor: escucha en UDP/53 o el puerto configurado
+  dns-interceptor:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ./dns-interceptor
+    ports:
+      # Puerto DNS estándar
+      - "53:53/udp"
+      # Puerto alternativo para pruebas
+      - "5354:5354/udp"
+    environment:
+      # Bind address: por defecto 0.0.0.0 (escucha en todas las interfaces)
+      INTERCEPTOR_BIND_ADDR: "0.0.0.0"
+      # Puerto UDP donde escucha el Interceptor
+      INTERCEPTOR_UDP_PORT: "5354"
+      # URL del DNS API: por defecto apunta al mock local en este compose
+      # Para integración real con el DNS API, cambiar a: http://<url-real-del-dns-api>:8080
+      DNS_API_URL: "http://mock-dns-api:8081"
+      # Timeout de las solicitudes HTTP al DNS API (ms)
+      DNS_API_TIMEOUT_MS: "5000"
+      # Nivel de logging: debug, info, warn, error
+      RUST_LOG: "info"
+    depends_on:
+      - mock-dns-api
+
+# Ejemplo para levantar con Docker Compose en desarrollo:
+#
+#   docker-compose up -d
+#
+# Probar el Interceptor desde el host:
+#
+#   nslookup example.com 127.0.0.1
+#   dig @127.0.0.1 example.com
+#
+# Para integración real (P3), actualizar DNS_API_URL en la sección de environment del
+# dns-interceptor service, remover el servicio mock-dns-api (o dejarlo comentado), y ajustar
+# depends_on si es necesario.
+#
+# Logs en tiempo real:
+#
+#   docker-compose logs -f dns-interceptor
