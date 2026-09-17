@@ -9,9 +9,7 @@ pub struct Configuracion {
     pub direccion_bind: String,
     pub puerto_udp: u16,
     pub url_api_dns: String,
-    pub bind_addr: String,
-    pub udp_port: u16,
-    pub dns_api_url: String,
+    pub timeout_ms: u64,
 }
 
 impl Configuracion {
@@ -25,25 +23,20 @@ impl Configuracion {
             .and_then(|v| v.parse::<u16>().ok())
             .unwrap_or(5353);
 
-        let url_api_dns =
-            env::var("DNS_API_URL").unwrap_or_else(|_| "http://localhost:8080".to_string());
-
         // Default apunta al mock_dns_api local; en integración real, P3 define el valor final.
-        let dns_api_url =
+        let url_api_dns =
             env::var("DNS_API_URL").unwrap_or_else(|_| "http://localhost:8081".to_string());
 
-        let dns_api_timeout_ms = env::var("DNS_API_TIMEOUT_MS")
+        let timeout_ms = env::var("DNS_API_TIMEOUT_MS")
             .ok()
             .and_then(|v| v.parse::<u64>().ok())
             .unwrap_or(5000);
 
         Self {
-            direccion_bind: direccion_bind.clone(),
+            direccion_bind,
             puerto_udp,
-            url_api_dns: url_api_dns.clone(),
-            bind_addr: direccion_bind,
-            udp_port: puerto_udp,
-            dns_api_url: url_api_dns,
+            url_api_dns,
+            timeout_ms,
         }
     }
 

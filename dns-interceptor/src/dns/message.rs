@@ -23,12 +23,12 @@ pub struct DnsMessage {
 impl DnsMessage {
     /// Parsea únicamente el header, lo demas se parsea en futuros feats.
     pub fn parse(raw: Vec<u8>) -> Result<Self, DnsParseError> {
-        let header = DnsHeader::parse(&raw)?;
+        let header = DnsHeader::parsear(&raw)?;
         Ok(Self { header, raw })
     }
 
     pub fn classify(&self) -> PacketKind {
-        if self.header.is_standard_query() {
+        if self.header.es_consulta_estandar() {
             PacketKind::StandardQuery
         } else {
             PacketKind::NonStandard

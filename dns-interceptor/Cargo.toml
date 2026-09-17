@@ -7,24 +7,19 @@ edition = "2021"
 # runtime asinc para multiples peticiones UDP concurrentes
 tokio = { version = "1", features = ["full"] }
 
-# cliente y modelos HTTP - JSON para comunicar con DNS API
-reqwest = { version = "0.11", features = ["json"] }
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-
-# Codificación  BASE64 para datos no estándar
-base64 = "0.21"
-
-# para el random 
-rand = "0.8"
-
-# para el logging en consola
-tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-# Cliente HTTPS para delegar paquetes no estándar al DNS API.
+# Cliente HTTPS para delegar paquetes no estándar al DNS API (rustls = TLS puro Rust, no requiere OpenSSL del sistema).
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
-# Codificación BASE64 del paquete DNS intercambiado con el DNS API.
-base64 = "0.22"
+
 # (De)serialización del body JSON asumido para /api/dns_resolver.
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+
+# Codificación BASE64 del paquete DNS intercambiado con el DNS API.
+base64 = "0.22"
+
+# para el random (usado por P2 para estrategias)
+rand = "0.8"
+
+# para el logging estructurado en consola
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }

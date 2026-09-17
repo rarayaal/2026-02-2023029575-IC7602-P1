@@ -94,7 +94,7 @@ mod tests {
         let response = build_response(&query, &question, &records);
 
         // Header: mismo ID, QR=1, ANCOUNT=1.
-        let header = crate::dns::header::DnsHeader::parse(&response).unwrap();
+        let header = crate::dns::header::DnsHeader::parsear(&response).unwrap();
         assert_eq!(header.id, 0x1234);
         assert!(header.qr);
         assert!(header.aa);
@@ -130,7 +130,7 @@ mod tests {
         ];
 
         let response = build_response(&query, &question, &records);
-        let header = crate::dns::header::DnsHeader::parse(&response).unwrap();
+        let header = crate::dns::header::DnsHeader::parsear(&response).unwrap();
         assert_eq!(header.ancount, 2);
     }
 

@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use tracing::info;
 
-use crate::models::{PaqueteDnsBase64, RegistroDns, RespuestaExiste, RespuestaPaisIp};
+use crate::models::{RegistroDns, RespuestaExiste, RespuestaPaisIp};
 
 #[derive(Debug, Serialize)]
 struct ResolveRequest<'a> {

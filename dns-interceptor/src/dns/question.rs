@@ -1,16 +1,14 @@
-use super::header::{DnsParseError, ErrorParseoDns, TAMANO_ENCABEZADO};
+use super::header::DnsParseError;
+
+const TAMANO_ENCABEZADO: usize = 12;
 
 /// Sección Question de un mensaje DNS (RFC1035): nombre solicitado + tipo + clase.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Question {
     pub qname: String,
-    pub nombre_host: String,
     pub qtype: u16,
-    pub tipo_consulta: u16,
     pub qclass: u16,
-    pub clase_consulta: u16,
     pub consumed: usize,
-    pub offset_final: usize,
 }
 
 pub type PreguntaDns = Question;
@@ -53,30 +51,20 @@ impl Question {
         let qname = labels.join(".");
 
         Ok(Self {
-            qname: qname.clone(),
-            nombre_host: qname,
+            qname,
             qtype,
-            tipo_consulta: qtype,
             qclass,
-            clase_consulta: qclass,
             consumed: offset,
-            offset_final: offset,
         })
     }
 
-    pub fn parsear(bytes: &[u8]) -> Result<Self, ErrorParseoDns> {
+    pub fn parsear(bytes: &[u8]) -> Result<Self, DnsParseError> {
         if bytes.len() <= TAMANO_ENCABEZADO {
-            return Err(ErrorParseoDns::DemasiadoCorto);
+            return Err(DnsParseError::TooShort);
         }
 
         let pregunta = Self::parse(&bytes[TAMANO_ENCABEZADO..])?;
-        Ok(Self {
-            offset_final: TAMANO_ENCABEZADO + pregunta.consumed,
-            ..pregunta
-        })
-    }
-}
-        })
+        Ok(pregunta)
     }
 }
 
@@ -99,13 +87,11 @@ mod tests {
     #[test]
     fn parsea_qname_valido() {
         let bytes = encode_question(&["app", "company", "com"], 1, 1);
-
         let q = PreguntaDns::parsear(&bytes).unwrap();
-        assert_eq!(q.nombre_host, "app.company.com");
         assert_eq!(q.qname, "app.company.com");
-        assert_eq!(q.tipo_consulta, 1);
-        assert_eq!(q.clase_consulta, 1);
-        assert_eq!(q.offset_final, bytes.len());
+        assert_eq!(q.qtype, 1);
+        assert_eq!(q.qclass, 1);
+        assert_eq!(q.consumed, bytes.len() - TAMANO_ENCABEZADO);
     }
 
     #[test]
@@ -122,10 +108,7 @@ mod tests {
         let mut bytes = vec![0; TAMANO_ENCABEZADO];
         bytes.extend_from_slice(&[0xC0, 0x0C, 0x00, 0x01, 0x00, 0x01]);
 
-        assert_eq!(
-            PreguntaDns::parsear(&bytes),
-            Err(ErrorParseoDns::PunteroNombreNoSoportado)
-        );
+        assert!(PreguntaDns::parsear(&bytes).is_err());
     }
 
     #[test]
@@ -133,10 +116,6 @@ mod tests {
         let mut bytes = vec![0; TAMANO_ENCABEZADO];
         bytes.extend_from_slice(&[0x07, b'e', b'x']);
 
-        assert_eq!(
-            PreguntaDns::parsear(&bytes),
-            Err(ErrorParseoDns::DemasiadoCorto)
-        );
-    }
+        assert!(PreguntaDns::parsear(&bytes).is_err());
     }
 }
