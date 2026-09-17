@@ -1,14 +1,23 @@
 [package]
 name = "dns-interceptor"
 version = "0.1.0"
-edition = "2024"
-
-[dependencies]
 edition = "2021"
 
 [dependencies]
-# Runtime async: permite atender múltiples paquetes UDP en paralelo.
+# runtime asinc para multiples peticiones UDP concurrentes
 tokio = { version = "1", features = ["full"] }
-# Logging estructurado, útil para depurar paquetes DNS crudos durante las pruebas.
+
+# cliente y modelos HTTP - JSON para comunicar con DNS API
+reqwest = { version = "0.11", features = ["json"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Codificación  BASE64 para datos no estándar
+base64 = "0.21"
+
+# para el random 
+rand = "0.8"
+
+# para el logging en consola
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
