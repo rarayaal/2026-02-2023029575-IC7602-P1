@@ -31,11 +31,18 @@ function DashboardPage() {
           if (byType[r.type] !== undefined) {
             byType[r.type]++;
           }
-          if (r.status === 'healthy') healthChecks.healthy++;
-          else if (r.status === 'unhealthy') healthChecks.unhealthy++;
+
+          const targets = Array.isArray(r.targets) ? r.targets : [];
+          const hasUnhealthy = targets.some((t) => t.status === 'unhealthy');
+          const hasHealthy = targets.some((t) => t.status === 'healthy');
+          const status = hasUnhealthy ? 'unhealthy' : hasHealthy ? 'healthy' : 'unknown';
+
+          if (status === 'healthy') healthChecks.healthy++;
+          else if (status === 'unhealthy') healthChecks.unhealthy++;
           else healthChecks.unknown++;
 
-          if (r.healthCheck && r.healthCheck !== 'Ninguno' && r.healthCheck !== 'None') {
+          const hasActiveCheck = targets.some((t) => Boolean(t.healthCheckId));
+          if (hasActiveCheck) {
             healthChecks.active++;
           }
         });
@@ -66,10 +73,6 @@ function DashboardPage() {
         <div>
           <h2 className="page-title">Dashboard General</h2>
           <p className="page-subtitle">Resumen estadístico y estado del servicio de resolución DNS</p>
-        </div>
-        <div className="system-status-pill">
-          <span className="status-dot green"></span>
-          <span>Sistema Operativo</span>
         </div>
       </header>
 
