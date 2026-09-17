@@ -11,6 +11,7 @@ function HealthChecksPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCheck, setEditingCheck] = useState(null);
   const [deletingCheck, setDeletingCheck] = useState(null);
+  const [viewingCheck, setViewingCheck] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [feedback, setFeedback] = useState(null);
 
@@ -92,9 +93,9 @@ function HealthChecksPage() {
     return checks.filter((check) => {
       const matchesSearch =
         check.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        check.target.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        check.associatedRecord.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesType = typeFilter === 'all' || check.type === typeFilter;
+        (check.target && check.target.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (check.associatedRecord && check.associatedRecord.toLowerCase().includes(searchTerm.toLowerCase()));
+      const matchesType = typeFilter === 'all' || check.protocol === typeFilter || check.type === typeFilter;
       const matchesStatus = statusFilter === 'all' || check.status === statusFilter;
       return matchesSearch && matchesType && matchesStatus;
     });
@@ -172,7 +173,7 @@ function HealthChecksPage() {
             <tr>
               <th>ID</th>
               <th>Nombre del Check</th>
-              <th>Tipo</th>
+              <th>Protocolo</th>
               <th>Objetivo / Endpoint</th>
               <th>Intervalo / Timeout</th>
               <th>Estado</th>
@@ -193,22 +194,28 @@ function HealthChecksPage() {
                   <td className="font-mono text-muted">{check.id}</td>
                   <td className="font-semibold">{check.name}</td>
                   <td>
-                    <span className={`type-badge ${check.type === 'HTTP' ? 'single' : 'multi'}`}>
-                      {check.type}
+                    <span className={`type-badge ${(check.protocol || check.type) === 'HTTP' ? 'single' : 'multi'}`}>
+                      {check.protocol || check.type}
                     </span>
                   </td>
-                  <td className="main-info-cell font-mono">{check.target}</td>
-                  <td className="text-muted">{check.intervalSec}s / {check.timeoutSec}s</td>
+                  <td className="main-info-cell font-mono">{check.target || `${check.protocol || check.type} ${check.port}`}</td>
+                  <td className="text-muted">
+                    {check.intervalSeconds || 30}s / {check.timeoutMs ? `${check.timeoutMs}ms` : '5000ms'}
+                  </td>
                   <td>
-                    <span className={`status-badge ${check.status}`}>
+                    <span className={`status-badge ${check.status || 'unknown'}`}>
                       <span className="status-dot-sm"></span>
-                      {check.status}
+                      {check.status || 'unknown'}
                     </span>
                   </td>
-                  <td className="text-muted">{check.associatedRecord}</td>
+                  <td className="text-muted">{check.associatedRecord || 'Ninguno'}</td>
                   <td>
                     <div className="actions-cell">
-                      <button className="btn-icon view" title="Ver detalle (Visual)">
+                      <button
+                        className="btn-icon view"
+                        title="Ver detalle del check"
+                        onClick={() => setViewingCheck(check)}
+                      >
                         👁️
                       </button>
                       <button
@@ -252,6 +259,97 @@ function HealthChecksPage() {
         initialData={editingCheck}
       />
 
+      {/* Modal de Visualización Detallada (Boton Ojo 👁️) */}
+      {viewingCheck && (
+        <div className="modal-overlay" onClick={() => setViewingCheck(null)}>
+          <div className="modal-container" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '640px' }}>
+            <div className="modal-header">
+              <h3 className="modal-title">👁️ Detalle del Health Check ({viewingCheck.id})</h3>
+              <button className="modal-close-btn" onClick={() => setViewingCheck(null)}>
+                ✕
+              </button>
+            </div>
+
+            <div style={{ margin: '1rem 0', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', background: 'var(--bg-dark)', padding: '1rem', borderRadius: '0.5rem', border: '1px solid var(--border-color)' }}>
+                <div>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block' }}>Nombre:</span>
+                  <strong style={{ fontSize: '1rem', color: 'var(--text-main)' }}>{viewingCheck.name}</strong>
+                </div>
+                <div>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block' }}>Protocolo / Tipo:</span>
+                  <span className={`type-badge ${(viewingCheck.protocol || viewingCheck.type) === 'HTTP' ? 'single' : 'multi'}`}>
+                    {viewingCheck.protocol || viewingCheck.type}
+                  </span>
+                </div>
+                <div>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block' }}>Host / IP:</span>
+                  <span className="font-mono">{viewingCheck.host || viewingCheck.ip || 'N/A'}</span>
+                </div>
+                <div>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block' }}>Puerto:</span>
+                  <span className="font-mono">{viewingCheck.port}</span>
+                </div>
+                {(viewingCheck.protocol || viewingCheck.type) === 'HTTP' && (
+                  <>
+                    <div>
+                      <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block' }}>Método HTTP:</span>
+                      <span className="font-mono">{viewingCheck.method || 'GET'}</span>
+                    </div>
+                    <div>
+                      <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block' }}>Ruta / Path:</span>
+                      <span className="font-mono">{viewingCheck.path || '/'}</span>
+                    </div>
+                    <div>
+                      <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block' }}>Códigos Esperados:</span>
+                      <span className="font-mono">{JSON.stringify(viewingCheck.expectedStatuses || [200])}</span>
+                    </div>
+                    <div>
+                      <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block' }}>Basic Auth:</span>
+                      <span className="font-mono text-muted">
+                        {viewingCheck.basicAuth ? `user: ${viewingCheck.basicAuth.username}` : 'Desactivado'}
+                      </span>
+                    </div>
+                  </>
+                )}
+                <div>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block' }}>Intervalo:</span>
+                  <span className="font-mono">{viewingCheck.intervalSeconds || 30}s</span>
+                </div>
+                <div>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block' }}>Timeout:</span>
+                  <span className="font-mono">{viewingCheck.timeoutMs ? `${viewingCheck.timeoutMs}ms` : '5000ms'}</span>
+                </div>
+                <div>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block' }}>Reintentos (Retries):</span>
+                  <span className="font-mono">{viewingCheck.retries ?? 3}</span>
+                </div>
+                <div>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block' }}>Estado:</span>
+                  <span className={`status-badge ${viewingCheck.status || 'unknown'}`}>
+                    <span className="status-dot-sm"></span>
+                    {viewingCheck.status || 'unknown'}
+                  </span>
+                </div>
+              </div>
+
+              <div>
+                <h4 style={{ fontSize: '0.85rem', marginBottom: '0.25rem', color: 'var(--text-muted)' }}>Payload JSON (Modelo DNS API):</h4>
+                <pre style={{ background: '#090d16', padding: '0.75rem', borderRadius: '0.5rem', fontSize: '0.8rem', color: '#38bdf8', overflowX: 'auto', border: '1px solid var(--border-color)' }}>
+                  {JSON.stringify(viewingCheck, null, 2)}
+                </pre>
+              </div>
+            </div>
+
+            <div className="modal-footer">
+              <button type="button" className="btn-secondary" onClick={() => setViewingCheck(null)}>
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Modal de Confirmación de Eliminación */}
       {deletingCheck && (
         <div className="modal-overlay" onClick={() => setDeletingCheck(null)}>
@@ -267,8 +365,8 @@ function HealthChecksPage() {
               <p>¿Está seguro de que desea eliminar el siguiente Health Check?</p>
               <div style={{ background: 'var(--bg-dark)', border: '1px solid var(--border-color)', padding: '1rem', borderRadius: '0.5rem', marginTop: '0.75rem' }}>
                 <p style={{ fontWeight: 600, color: 'var(--text-main)' }}>Nombre: {deletingCheck.name}</p>
-                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>ID: {deletingCheck.id} | Tipo: {deletingCheck.type}</p>
-                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Objetivo: {deletingCheck.target}</p>
+                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>ID: {deletingCheck.id} | Tipo: {deletingCheck.type || deletingCheck.protocol}</p>
+                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Objetivo: {deletingCheck.target || `${deletingCheck.protocol}:${deletingCheck.port}`}</p>
               </div>
               <p style={{ fontSize: '0.85rem', color: '#f87171', marginTop: '0.75rem' }}>
                 Esta acción eliminará el monitoreo local y no se puede deshacer.
