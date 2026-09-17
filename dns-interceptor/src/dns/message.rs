@@ -17,8 +17,6 @@ pub enum PacketKind {
 #[derive(Debug)]
 pub struct DnsMessage {
     pub header: DnsHeader,
-    // Se usa a partir de la Fase 5 (delegación BASE64 al DNS API); por ahora solo lo leen los tests.
-    #[allow(dead_code)]
     pub raw: Vec<u8>,
 }
 

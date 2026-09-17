@@ -9,3 +9,10 @@ tokio = { version = "1", features = ["full"] }
 # Logging estructurado, útil para depurar paquetes DNS crudos durante las pruebas.
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+# Cliente HTTPS para delegar paquetes no estándar al DNS API.
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+# Codificación BASE64 del paquete DNS intercambiado con el DNS API.
+base64 = "0.22"
+# (De)serialización del body JSON asumido para /api/dns_resolver.
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
