@@ -5,7 +5,7 @@ use tokio::net::UdpSocket;
 use tracing::{info, warn};
 
 use crate::config::Config;
-use crate::dns::{DnsMessage, PacketKind};
+use crate::dns::{build_response, DnsMessage, PacketKind, ResolvedRecord};
 
 /// Tamaño clásico máximo de un mensaje DNS sobre UDP sin EDNS0 (RFC1035 sección 4.2.1).
 /// Paquetes más grandes se fragmentan (todavía no implementado).
@@ -42,8 +42,8 @@ pub async fn run(config: Config) -> std::io::Result<()> {
 }
 
 /// Procesa un único paquete: parsea el header, lo clasifica y, si es un query estándar, extrae
-/// el hostname. Por ahora no se hace un envio "real".
-async fn handle_packet(packet: Vec<u8>, client_addr: SocketAddr, _socket: Arc<UdpSocket>) {
+/// el hostname y responde con el serializador genérico.
+async fn handle_packet(packet: Vec<u8>, client_addr: SocketAddr, socket: Arc<UdpSocket>) {
     match DnsMessage::parse(packet) {
         Ok(message) => {
             let kind = message.classify();
@@ -52,10 +52,23 @@ async fn handle_packet(packet: Vec<u8>, client_addr: SocketAddr, _socket: Arc<Ud
                 // Solo los query estándar se resuelven localmente, el resto se delega
                 // íntegro al DNS API, sin necesidad de leer su contenido.
                 PacketKind::StandardQuery => match message.question() {
-                    Ok(question) => info!(
-                        "Paquete de {client_addr}: id={:#06x} qname={} qtype={} qclass={} -> {:?}",
-                        message.header.id, question.qname, question.qtype, question.qclass, kind
-                    ),
+                    Ok(question) => {
+                        info!(
+                            "Paquete de {client_addr}: id={:#06x} qname={} qtype={} qclass={} -> {:?}",
+                            message.header.id, question.qname, question.qtype, question.qclass, kind
+                        );
+
+                        // Placeholder mientras no esta la integración con la API.
+                        let records = [ResolvedRecord {
+                            ip: "93.184.216.34".parse().unwrap(),
+                            ttl: 300,
+                        }];
+                        let response = build_response(&message, &question, &records);
+
+                        if let Err(e) = socket.send_to(&response, client_addr).await {
+                            warn!("Error enviando respuesta a {client_addr}: {e}");
+                        }
+                    }
                     Err(e) => warn!(
                         "Paquete de {client_addr} clasificado como {kind:?} pero con Question inválida: {e:?}"
                     ),
