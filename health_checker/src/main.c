@@ -1,3 +1,4 @@
+#include "http_checker.h"
 #include "models.h"
 #include "supabase_client.h"
 #include "tcp_checker.h"
@@ -48,9 +49,30 @@ static void evaluate_target(TargetNode *target, size_t index) {
              res.attempts_made, res.error_message);
     }
   } else if (target->config->protocol == PROTO_HTTP) {
-    printf("      └─ [HTTP Check] Protocolo HTTP configurado en puerto %d "
-           "(Evaluacion en T-28)\n",
-           target->config->port);
+    printf("      └─ [HTTP Check] Solicitando http://%s:%d%s (Timeout: %dms, "
+           "Retries: %d)...\n",
+           target->ip_address, target->config->port,
+           target->config->path ? target->config->path : "/",
+           target->config->timeout_ms, target->config->retries);
+
+    HttpCheckResult res = http_check_perform(
+        target->ip_address, target->config->port, target->config->path,
+        target->config->expected_statuses,
+        target->config->expected_statuses_count,
+        target->config->basic_auth_user, target->config->basic_auth_pass,
+        target->config->timeout_ms, target->config->retries);
+
+    target->is_healthy = res.is_healthy;
+
+    if (res.is_healthy) {
+      printf("         └─ Estado: HEALTHY (HTTP Status: %ld, RTT: %.3f ms, "
+             "Intentos: %d)\n",
+             res.http_status, res.rtt_ms, res.attempts_made);
+    } else {
+      printf("         └─ Estado: UNHEALTHY (HTTP Status: %ld, Fallo tras %d "
+             "intentos. Motivo: %s)\n",
+             res.http_status, res.attempts_made, res.error_message);
+    }
   }
 }
 
