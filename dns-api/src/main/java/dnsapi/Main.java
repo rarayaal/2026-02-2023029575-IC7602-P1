@@ -4,7 +4,7 @@ import dnsapi.config.ApiConfig;
 import dnsapi.config.ConfigurationException;
 import dnsapi.http.ApiServer;
 import dnsapi.records.DnsRecordRepository;
-import dnsapi.records.InMemoryDnsRecordRepository;
+import dnsapi.records.SupabaseDnsRecordRepository;
 import dnsapi.supabase.SupabaseClient;
 import dnsapi.supabase.SupabaseException;
 import org.slf4j.Logger;
@@ -28,10 +28,7 @@ public final class Main {
             supabase.get("dns_records", "select=id&limit=1");
             log.info("Conexion con Supabase verificada");
 
-            // Temporal: los registros siguen en memoria hasta que exista el repositorio de Supabase.
-            // Al cambiar esta linea, los endpoints siguen funcionando sin modificarse.
-            DnsRecordRepository records = InMemoryDnsRecordRepository.withSampleData();
-            log.warn("Usando el repositorio en memoria con datos de ejemplo");
+            DnsRecordRepository records = new SupabaseDnsRecordRepository(supabase);
 
             ApiServer server = new ApiServer(config, records);
             // Para que Docker pueda detener el contenedor sin matar peticiones a medio atender.
