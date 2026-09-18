@@ -1,78 +1,70 @@
-// modulo para leer la seccion de pregunta de un paquete DNS segun RFC1035
+use super::header::DnsParseError;
 
-use super::header::{ErrorParseoDns, TAMANO_ENCABEZADO};
+const TAMANO_ENCABEZADO: usize = 12;
 
-// guarda los datos de la pregunta DNS
+/// Sección Question de un mensaje DNS (RFC1035): nombre solicitado + tipo + clase.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PreguntaDns {
-    // nombre del host consultado
-    pub nombre_host: String,
-    // tipo de consulta uno para IPv4 o 28 para IPv6
-    pub tipo_consulta: u16,
-    // clase de la consulta uno para internet
-    pub clase_consulta: u16,
-    // posicion en bytes donde termina la pregunta
-    pub offset_final: usize,
+pub struct Question {
+    pub qname: String,
+    pub qtype: u16,
+    pub qclass: u16,
+    pub consumed: usize,
 }
 
-impl PreguntaDns {
-    // lee la pregunta del paquete empezando despues del encabezado
-    pub fn parsear(bytes: &[u8]) -> Result<Self, ErrorParseoDns> {
-        // revisa que tenga mas de 12 bytes
-        if bytes.len() <= TAMANO_ENCABEZADO {
-            return Err(ErrorParseoDns::DemasiadoCorto);
-        }
+pub type PreguntaDns = Question;
 
-        let mut cursor = TAMANO_ENCABEZADO;
-        let mut etiquetas = Vec::new();
+impl Question {
+    pub fn parse(body: &[u8]) -> Result<Self, DnsParseError> {
+        let mut labels = Vec::new();
+        let mut offset = 0;
 
-        // bucle para sacar cada parte del nombre
         loop {
-            if cursor >= bytes.len() {
-                return Err(ErrorParseoDns::PreguntaInvalida);
-            }
+            let len_byte = *body.get(offset).ok_or(DnsParseError::TooShort)?;
 
-            // saca el largo de la siguiente parte
-            let longitud = bytes[cursor] as usize;
-            if longitud == 0 {
-                // byte cero indica el final del nombre
-                cursor += 1;
+            if len_byte == 0 {
+                offset += 1;
                 break;
             }
 
-            // valida que no tenga punteros raros ni se salga del buffer
-            if longitud >= 192 || cursor + 1 + longitud > bytes.len() {
-                return Err(ErrorParseoDns::PreguntaInvalida);
+            if len_byte & 0b1100_0000 != 0 {
+                return Err(DnsParseError::UnsupportedNamePointer);
             }
 
-            // extrae el texto de la etiqueta
-            let bytes_etiqueta = &bytes[cursor + 1..cursor + 1 + longitud];
-            let texto_etiqueta = std::str::from_utf8(bytes_etiqueta)
-                .map_err(|_| ErrorParseoDns::PreguntaInvalida)?;
+            let label_len = len_byte as usize;
+            offset += 1;
+            let label_bytes = body
+                .get(offset..offset + label_len)
+                .ok_or(DnsParseError::TooShort)?;
+            let label = std::str::from_utf8(label_bytes)
+                .map_err(|_| DnsParseError::InvalidQuestion)?
+                .to_lowercase();
 
-            // guarda la palabra en minusculas
-            etiquetas.push(texto_etiqueta.to_lowercase());
-            cursor += 1 + longitud;
+            labels.push(label);
+            offset += label_len;
         }
 
-        // lee los ultimos cuatro bytes con el QTYPE y QCLASS
-        if cursor + 4 > bytes.len() {
-            return Err(ErrorParseoDns::PreguntaInvalida);
-        }
+        let qtype_qclass = body.get(offset..offset + 4).ok_or(DnsParseError::TooShort)?;
+        let qtype = u16::from_be_bytes([qtype_qclass[0], qtype_qclass[1]]);
+        let qclass = u16::from_be_bytes([qtype_qclass[2], qtype_qclass[3]]);
+        offset += 4;
 
-        let tipo_consulta = u16::from_be_bytes([bytes[cursor], bytes[cursor + 1]]);
-        let clase_consulta = u16::from_be_bytes([bytes[cursor + 2], bytes[cursor + 3]]);
-        let offset_final = cursor + 4;
-
-        // une las palabras con puntos para armar el FQDN
-        let nombre_host = etiquetas.join(".");
+        let qname = labels.join(".");
 
         Ok(Self {
-            nombre_host,
-            tipo_consulta,
-            clase_consulta,
-            offset_final,
+            qname,
+            qtype,
+            qclass,
+            consumed: offset,
         })
+    }
+
+    pub fn parsear(bytes: &[u8]) -> Result<Self, DnsParseError> {
+        if bytes.len() <= TAMANO_ENCABEZADO {
+            return Err(DnsParseError::TooShort);
+        }
+
+        let pregunta = Self::parse(&bytes[TAMANO_ENCABEZADO..])?;
+        Ok(pregunta)
     }
 }
 
@@ -80,22 +72,50 @@ impl PreguntaDns {
 mod tests {
     use super::*;
 
+    fn encode_question(labels: &[&str], qtype: u16, qclass: u16) -> Vec<u8> {
+        let mut bytes = vec![0; TAMANO_ENCABEZADO];
+        for label in labels {
+            bytes.push(label.len() as u8);
+            bytes.extend_from_slice(label.as_bytes());
+        }
+        bytes.push(0);
+        bytes.extend_from_slice(&qtype.to_be_bytes());
+        bytes.extend_from_slice(&qclass.to_be_bytes());
+        bytes
+    }
+
     #[test]
     fn parsea_qname_valido() {
-        // simulacion binaria de una pregunta DNS
-        let bytes = vec![
-            0x12, 0x34, 0x01, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // header de 12 bytes
-            0x03, b'a', b'p', b'p', // tres bytes app
-            0x07, b'c', b'o', b'm', b'p', b'a', b'n', b'y', // siete bytes company
-            0x03, b'c', b'o', b'm', // tres bytes com
-            0x00,       // fin del nombre
-            0x00, 0x01, // tipo A
-            0x00, 0x01, // clase IN
-        ];
-
+        let bytes = encode_question(&["app", "company", "com"], 1, 1);
         let q = PreguntaDns::parsear(&bytes).unwrap();
-        assert_eq!(q.nombre_host, "app.company.com");
-        assert_eq!(q.tipo_consulta, 1);
-        assert_eq!(q.clase_consulta, 1);
+        assert_eq!(q.qname, "app.company.com");
+        assert_eq!(q.qtype, 1);
+        assert_eq!(q.qclass, 1);
+        assert_eq!(q.consumed, bytes.len() - TAMANO_ENCABEZADO);
+    }
+
+    #[test]
+    fn parsea_body_desde_question() {
+        let packet = encode_question(&["example", "com"], 28, 1);
+        let q = Question::parse(&packet[TAMANO_ENCABEZADO..]).unwrap();
+        assert_eq!(q.qname, "example.com");
+        assert_eq!(q.qtype, 28);
+        assert_eq!(q.consumed, packet.len() - TAMANO_ENCABEZADO);
+    }
+
+    #[test]
+    fn rechaza_puntero_de_compresion() {
+        let mut bytes = vec![0; TAMANO_ENCABEZADO];
+        bytes.extend_from_slice(&[0xC0, 0x0C, 0x00, 0x01, 0x00, 0x01]);
+
+        assert!(PreguntaDns::parsear(&bytes).is_err());
+    }
+
+    #[test]
+    fn rechaza_paquete_truncado() {
+        let mut bytes = vec![0; TAMANO_ENCABEZADO];
+        bytes.extend_from_slice(&[0x07, b'e', b'x']);
+
+        assert!(PreguntaDns::parsear(&bytes).is_err());
     }
 }

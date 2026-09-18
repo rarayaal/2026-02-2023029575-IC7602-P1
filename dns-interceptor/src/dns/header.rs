@@ -1,14 +1,24 @@
-// modulo para parsear el encabezado de un paquete DNS
-pub const TAMANO_ENCABEZADO: usize = 12;
+/// Tamaño fijo del header DNS: 12 bytes (RFC1035).
+pub const HEADER_SIZE: usize = 12;
+pub const TAMANO_ENCABEZADO: usize = HEADER_SIZE;
 
-// errores de lectura al procesar los bytes
 #[derive(Debug, PartialEq, Eq)]
-pub enum ErrorParseoDns {
-    DemasiadoCorto,
-    PreguntaInvalida,
+pub enum DnsParseError {
+    TooShort,
+    InvalidQuestion,
+    UnsupportedNamePointer,
 }
 
-// estructura con los 12 bytes del encabezado DNS
+impl DnsParseError {
+    pub const DemasiadoCorto: Self = Self::TooShort;
+    pub const PreguntaInvalida: Self = Self::InvalidQuestion;
+    pub const PunteroNombreNoSoportado: Self = Self::UnsupportedNamePointer;
+}
+
+pub type ErrorParseoDns = DnsParseError;
+pub type DnsHeader = EncabezadoDns;
+
+/// Header de 12 bytes de un mensaje DNS.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EncabezadoDns {
     pub id: u16, // identificador de transaccion
