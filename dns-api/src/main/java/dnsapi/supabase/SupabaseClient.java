@@ -59,9 +59,11 @@ public final class SupabaseClient {
                 .method("PATCH", bodyOf(body)));
     }
 
-    /** Borra las filas que cumplan el filtro. */
-    public void delete(String resource, String query) {
-        send(request(resource, query).DELETE());
+    /** Borra las filas que cumplan el filtro y devuelve las que borro; vacio si no habia ninguna. */
+    public JsonNode delete(String resource, String query) {
+        return send(request(resource, query)
+                .header("Prefer", "return=representation")
+                .DELETE());
     }
 
     /** Codifica un valor para usarlo dentro de un filtro de la query string. */

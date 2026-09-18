@@ -30,6 +30,31 @@ public interface DnsRecordRepository {
     Optional<DnsRecord> findById(String id);
 
     /**
+     * Crea un registro con sus targets. Se ignoran los {@code id} y {@code status} que vengan en el
+     * registro recibido: los asigna la base y el Health Checker.
+     *
+     * @return el registro tal como quedo guardado, con sus ids
+     * @throws DuplicateDomainException si ya hay un registro para ese dominio
+     */
+    DnsRecord create(DnsRecord record);
+
+    /**
+     * Reemplaza un registro existente. Los targets se sincronizan por id: los que traen un id
+     * conocido se actualizan, los demas se crean, y los que ya no vienen se borran.
+     *
+     * @return el registro actualizado, o vacio si no existe ese id
+     * @throws DuplicateDomainException si el nuevo dominio ya lo usa otro registro
+     */
+    Optional<DnsRecord> update(String id, DnsRecord record);
+
+    /**
+     * Borra un registro. La base borra en cascada sus targets y los health checks de esos targets.
+     *
+     * @return {@code true} si existia y se borro
+     */
+    boolean delete(String id);
+
+    /**
      * Deja un nombre de dominio en su forma canonica.
      *
      * <p>En DNS los nombres no distinguen mayusculas, y un nombre absoluto puede venir con un punto
