@@ -1,12 +1,15 @@
 // aca leemos la configuracion del sistema desde el entorno
 use std::env;
 
-// estructura que guarda los parametros del interceptor
+/// Configuración del Interceptor. Se carga una única vez al arrancar.
+pub type Config = Configuracion;
+
 #[derive(Debug, Clone)]
 pub struct Configuracion {
     pub direccion_bind: String,
     pub puerto_udp: u16,
     pub url_api_dns: String,
+    pub timeout_ms: u64,
 }
 
 impl Configuracion {
@@ -20,13 +23,20 @@ impl Configuracion {
             .and_then(|v| v.parse::<u16>().ok())
             .unwrap_or(5353);
 
+        // Default apunta al mock_dns_api local; en integración real, P3 define el valor final.
         let url_api_dns =
-            env::var("DNS_API_URL").unwrap_or_else(|_| "http://localhost:8080".to_string());
+            env::var("DNS_API_URL").unwrap_or_else(|_| "http://localhost:8081".to_string());
+
+        let timeout_ms = env::var("DNS_API_TIMEOUT_MS")
+            .ok()
+            .and_then(|v| v.parse::<u64>().ok())
+            .unwrap_or(5000);
 
         Self {
             direccion_bind,
             puerto_udp,
             url_api_dns,
+            timeout_ms,
         }
     }
 
