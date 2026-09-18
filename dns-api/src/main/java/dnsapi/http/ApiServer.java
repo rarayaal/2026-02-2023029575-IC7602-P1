@@ -4,6 +4,7 @@ import dnsapi.config.ApiConfig;
 import dnsapi.records.DnsRecordRepository;
 import io.javalin.Javalin;
 import io.javalin.http.HttpStatus;
+import io.javalin.router.EndpointNotFound;
 import java.util.Map;
 import org.eclipse.jetty.util.thread.QueuedThreadPool;
 import org.slf4j.Logger;
@@ -38,14 +39,19 @@ public final class ApiServer {
         app.get("/api/health", ctx -> ctx.json(Map.of("status", "ok", "component", "dns-api")));
 
         new ExistsController(records).register(app);
+        new RecordsController(records).register(app);
 
         registerErrorHandlers();
     }
 
     private void registerErrorHandlers() {
         // Errores en JSON, para que el DNS Interceptor reciba siempre el mismo formato.
-        app.error(HttpStatus.NOT_FOUND.getCode(), ctx ->
-                ctx.json(new ErrorResponse("not_found", "No existe la ruta " + ctx.path())));
+        // Se atrapa EndpointNotFound, que Javalin lanza solo cuando ninguna ruta coincide. Un
+        // app.error(404) se ejecutaria tambien cuando un endpoint responde 404 a proposito, como
+        // un registro que no existe, y le pisaria su mensaje.
+        app.exception(EndpointNotFound.class, (exception, ctx) ->
+                ctx.status(HttpStatus.NOT_FOUND)
+                        .json(new ErrorResponse("not_found", "No existe la ruta " + ctx.path())));
 
         app.exception(Exception.class, (exception, ctx) -> {
             log.error("Error atendiendo {} {}", ctx.method(), ctx.path(), exception);
