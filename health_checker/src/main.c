@@ -5,6 +5,7 @@
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 
 static volatile bool keep_running = true;
@@ -17,8 +18,10 @@ static void handle_signal(int sig) {
   keep_running = false;
 }
 
-/* Evalua un target ejecutando su prueba de monitoreo correspondiente */
-static void evaluate_target(TargetNode *target, size_t index) {
+/* Evalua un target ejecutando su prueba de monitoreo correspondiente y reporta el resultado */
+static void evaluate_target(TargetNode *target, size_t index,
+                            const SupabaseConfig *config,
+                            const char *instance_id) {
   printf("  [%zu] Target IP: %s (Weight: %d, Country: %s)\n", index,
          target->ip_address, target->weight,
          target->country_code[0] ? target->country_code : "N/A");
@@ -27,6 +30,11 @@ static void evaluate_target(TargetNode *target, size_t index) {
     printf("      └─ Sin monitoreo activo o deshabilitado\n");
     return;
   }
+
+  bool is_healthy = false;
+  double rtt_ms = 0.0;
+  long http_code = 0;
+  const char *error_msg = NULL;
 
   if (target->config->protocol == PROTO_TCP) {
     printf("      └─ [TCP Check] Conectando a %s:%d (Timeout: %dms, Retries: "
@@ -38,7 +46,9 @@ static void evaluate_target(TargetNode *target, size_t index) {
         tcp_check_perform(target->ip_address, target->config->port,
                           target->config->timeout_ms, target->config->retries);
 
-    target->is_healthy = res.is_healthy;
+    is_healthy = res.is_healthy;
+    rtt_ms = res.rtt_ms;
+    error_msg = res.error_message;
 
     if (res.is_healthy) {
       printf("         └─ Estado: HEALTHY (RTT: %.3f ms, Intentos: %d)\n",
@@ -62,7 +72,10 @@ static void evaluate_target(TargetNode *target, size_t index) {
         target->config->basic_auth_user, target->config->basic_auth_pass,
         target->config->timeout_ms, target->config->retries);
 
-    target->is_healthy = res.is_healthy;
+    is_healthy = res.is_healthy;
+    rtt_ms = res.rtt_ms;
+    http_code = res.http_status;
+    error_msg = res.error_message;
 
     if (res.is_healthy) {
       printf("         └─ Estado: HEALTHY (HTTP Status: %ld, RTT: %.3f ms, "
@@ -72,6 +85,20 @@ static void evaluate_target(TargetNode *target, size_t index) {
       printf("         └─ Estado: UNHEALTHY (HTTP Status: %ld, Fallo tras %d "
              "intentos. Motivo: %s)\n",
              res.http_status, res.attempts_made, res.error_message);
+    }
+  }
+
+  target->is_healthy = is_healthy;
+
+  /* Reportar telemetria a Supabase para disparar el consenso */
+  if (config && instance_id) {
+    bool ok = supabase_post_check_result(config, instance_id, target->id,
+                                         is_healthy, rtt_ms, http_code,
+                                         error_msg);
+    if (ok) {
+      printf("         └─ [Consenso] Reporte enviado a Supabase exitosamente.\n");
+    } else {
+      printf("         └─ [Consenso] Advertencia: No se pudo enviar el reporte a Supabase.\n");
     }
   }
 }
@@ -94,6 +121,34 @@ int main(void) {
     return EXIT_FAILURE;
   }
 
+  /* Configuracion de la instancia para consenso y ubicacion */
+  const char *instance_id = getenv("INSTANCE_ID");
+  if (!instance_id || strlen(instance_id) == 0) {
+    instance_id = "hc-node-local";
+  }
+
+  const char *country_code = getenv("INSTANCE_COUNTRY");
+  if (!country_code || strlen(country_code) == 0) {
+    country_code = "CR";
+  }
+
+  const char *city = getenv("INSTANCE_CITY");
+  if (!city || strlen(city) == 0) {
+    city = "San Jose";
+  }
+
+  double latitude = 9.9281;
+  const char *lat_env = getenv("INSTANCE_LAT");
+  if (lat_env) {
+    latitude = atof(lat_env);
+  }
+
+  double longitude = -84.0907;
+  const char *lon_env = getenv("INSTANCE_LON");
+  if (lon_env) {
+    longitude = atof(lon_env);
+  }
+
   int sync_interval = 30;
   const char *interval_env = getenv("SYNC_INTERVAL_SECONDS");
   if (interval_env) {
@@ -107,27 +162,38 @@ int main(void) {
                            .service_role_key = supabase_key};
 
   printf("=====================================================\n");
-  printf("   HEALTH CHECKER - MOTOR TCP Y LECTURA (GNU C)      \n");
+  printf("   HEALTH CHECKER - MOTOR TCP, HTTP Y CONSENSO (C)   \n");
   printf("=====================================================\n");
   printf("[CONFIG] Supabase URL: %s\n", config.url);
+  printf("[CONFIG] Instance ID: %s (%s, %s [%.4f, %.4f])\n", instance_id,
+         city, country_code, latitude, longitude);
   printf("[CONFIG] Intervalo de sincronizacion: %d segundos\n\n",
          sync_interval);
 
-  /* Ciclo principal de sondeo y monitoreo */
+  /* Ciclo principal de sondeo, monitoreo y consenso */
   while (keep_running) {
+    /* Registro del latido de la instancia */
+    printf("[HEARTBEAT] Registrando latido de la instancia en Supabase...\n");
+    if (supabase_register_heartbeat(&config, instance_id, country_code, city,
+                                    latitude, longitude)) {
+      printf("[HEARTBEAT] Instancia confirmada como activa.\n");
+    } else {
+      printf("[WARN] No se pudo actualizar el latido de la instancia.\n");
+    }
+
     printf("[SYNC] Consultando targets activos desde Supabase...\n");
     TargetNode *targets = supabase_fetch_active_targets(&config);
 
     if (targets) {
       size_t count = target_list_count(targets);
       printf("[OK] Se cargaron %zu target(s) activo(s). Iniciando "
-             "evaluacion:\n",
+             "evaluacion y emision de votos:\n",
              count);
 
       size_t idx = 1;
       TargetNode *curr = targets;
       while (curr != NULL) {
-        evaluate_target(curr, idx++);
+        evaluate_target(curr, idx++, &config, instance_id);
         curr = curr->next;
       }
 

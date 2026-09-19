@@ -263,3 +263,140 @@ TargetNode *supabase_fetch_active_targets(const SupabaseConfig *config) {
 
   return targets;
 }
+
+/* Registra o actualiza el latido (heartbeat) y ubicacion de la instancia actual */
+bool supabase_register_heartbeat(const SupabaseConfig *config,
+                                 const char *instance_id,
+                                 const char *country_code,
+                                 const char *city,
+                                 double latitude,
+                                 double longitude) {
+  if (!config || !config->url || !config->service_role_key || !instance_id) {
+    return false;
+  }
+
+  CURL *curl = curl_easy_init();
+  if (!curl) {
+    return false;
+  }
+
+  char full_url[1024];
+  snprintf(full_url, sizeof(full_url), "%s/rest/v1/checker_instances",
+           config->url);
+
+  cJSON *root = cJSON_CreateObject();
+  cJSON_AddStringToObject(root, "instance_id", instance_id);
+  cJSON_AddStringToObject(root, "country_code",
+                          country_code ? country_code : "CR");
+  cJSON_AddStringToObject(root, "city", city ? city : "San Jose");
+  cJSON_AddNumberToObject(root, "latitude", latitude);
+  cJSON_AddNumberToObject(root, "longitude", longitude);
+  cJSON_AddBoolToObject(root, "is_active", true);
+
+  char *payload = cJSON_PrintUnformatted(root);
+  cJSON_Delete(root);
+
+  if (!payload) {
+    curl_easy_cleanup(curl);
+    return false;
+  }
+
+  struct curl_slist *headers = NULL;
+  char apikey_hdr[512];
+  char auth_hdr[512];
+  snprintf(apikey_hdr, sizeof(apikey_hdr), "apikey: %s",
+           config->service_role_key);
+  snprintf(auth_hdr, sizeof(auth_hdr), "Authorization: Bearer %s",
+           config->service_role_key);
+
+  headers = curl_slist_append(headers, apikey_hdr);
+  headers = curl_slist_append(headers, auth_hdr);
+  headers = curl_slist_append(headers, "Content-Type: application/json");
+  headers = curl_slist_append(headers, "Prefer: resolution=merge-duplicates");
+
+  curl_easy_setopt(curl, CURLOPT_URL, full_url);
+  curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+  curl_easy_setopt(curl, CURLOPT_POSTFIELDS, payload);
+  curl_easy_setopt(curl, CURLOPT_TIMEOUT, 10L);
+
+  CURLcode res = curl_easy_perform(curl);
+  long http_code = 0;
+  curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
+
+  free(payload);
+  curl_slist_free_all(headers);
+  curl_easy_cleanup(curl);
+
+  return (res == CURLE_OK && (http_code == 200 || http_code == 201 || http_code == 204));
+}
+
+/* Envia una medicion de health check a Supabase para evaluar el consenso */
+bool supabase_post_check_result(const SupabaseConfig *config,
+                                const char *instance_id,
+                                const char *target_id,
+                                bool is_healthy,
+                                double rtt_ms,
+                                long http_code,
+                                const char *error_message) {
+  if (!config || !config->url || !config->service_role_key || !instance_id ||
+      !target_id) {
+    return false;
+  }
+
+  CURL *curl = curl_easy_init();
+  if (!curl) {
+    return false;
+  }
+
+  char full_url[1024];
+  snprintf(full_url, sizeof(full_url), "%s/rest/v1/health_check_results",
+           config->url);
+
+  cJSON *root = cJSON_CreateObject();
+  cJSON_AddStringToObject(root, "instance_id", instance_id);
+  cJSON_AddStringToObject(root, "target_id", target_id);
+  cJSON_AddStringToObject(root, "status", is_healthy ? "healthy" : "unhealthy");
+  cJSON_AddNumberToObject(root, "rtt_ms", rtt_ms >= 0.0 ? rtt_ms : 0.0);
+  if (http_code > 0) {
+    cJSON_AddNumberToObject(root, "http_code", (double)http_code);
+  }
+  if (error_message && strlen(error_message) > 0) {
+    cJSON_AddStringToObject(root, "error_message", error_message);
+  }
+
+  char *payload = cJSON_PrintUnformatted(root);
+  cJSON_Delete(root);
+
+  if (!payload) {
+    curl_easy_cleanup(curl);
+    return false;
+  }
+
+  struct curl_slist *headers = NULL;
+  char apikey_hdr[512];
+  char auth_hdr[512];
+  snprintf(apikey_hdr, sizeof(apikey_hdr), "apikey: %s",
+           config->service_role_key);
+  snprintf(auth_hdr, sizeof(auth_hdr), "Authorization: Bearer %s",
+           config->service_role_key);
+
+  headers = curl_slist_append(headers, apikey_hdr);
+  headers = curl_slist_append(headers, auth_hdr);
+  headers = curl_slist_append(headers, "Content-Type: application/json");
+
+  curl_easy_setopt(curl, CURLOPT_URL, full_url);
+  curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+  curl_easy_setopt(curl, CURLOPT_POSTFIELDS, payload);
+  curl_easy_setopt(curl, CURLOPT_TIMEOUT, 10L);
+
+  CURLcode res = curl_easy_perform(curl);
+  long resp_code = 0;
+  curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &resp_code);
+
+  free(payload);
+  curl_slist_free_all(headers);
+  curl_easy_cleanup(curl);
+
+  return (res == CURLE_OK && (resp_code == 200 || resp_code == 201 || resp_code == 204));
+}
+
