@@ -1,0 +1,63 @@
+# Valores por omisión para el Chart dns-stack (T-38 - Rama Alexandra)
+
+# Componente 1: Base de Datos PostgreSQL
+database:
+  enabled: true
+  image:
+    repository: postgres
+    tag: 15-alpine
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 5432
+  env:
+    postgresDb: dns_db
+    postgresUser: postgres
+    postgresPassword: postgrespassword
+
+# Componente 2: Mock DNS API (Rust)
+mockDnsApi:
+  enabled: true
+  image:
+    repository: mock-dns-api
+    tag: latest
+    pullPolicy: Never
+  service:
+    type: ClusterIP
+    port: 8081
+  env:
+    port: "8081"
+
+# Componente 3: DNS Interceptor (Rust)
+dnsInterceptor:
+  enabled: true
+  image:
+    repository: dns-interceptor
+    tag: latest
+    pullPolicy: Never
+  service:
+    type: NodePort
+    udpPort: 5354
+    dnsPort: 53
+  env:
+    bindAddr: "0.0.0.0"
+    udpPort: "5354"
+    dnsApiUrl: "http://mock-dns-api:8081"
+    timeoutMs: "5000"
+
+# Componente 4: DNS UI (React + Vite + Nginx)
+dnsUi:
+  enabled: true
+  image:
+    repository: dns-ui
+    tag: latest
+    pullPolicy: Never
+  service:
+    type: LoadBalancer
+    port: 80
+  env:
+    apiUrl: "http://localhost:8081"
+
+# Componentes pendientes de integración (Esperando entregas de compañeros):
+# - dnsApi (Luis / T-23): Pendiente Dockerfile Java Spring Boot
+# - healthChecker (Otto / T-32): Pendiente Dockerfile C

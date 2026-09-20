@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "dns-stack.fullname" . }}-mock-dns-api
+  labels:
+    app: mock-dns-api
+    {{- include "dns-stack.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mock-dns-api
+  template:
+    metadata:
+      labels:
+        app: mock-dns-api
+    spec:
+      containers:
+        - name: mock-dns-api
+          image: "{{ .Values.mockDnsApi.image.repository }}:{{ .Values.mockDnsApi.image.tag }}"
+          imagePullPolicy: {{ .Values.mockDnsApi.image.pullPolicy }}
+          command: ["./mock_dns_api"]
+          ports:
+            - containerPort: 8081
+          env:
+            - name: MOCK_API_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "dns-stack.fullname" . }}-config
+                  key: MOCK_API_PORT
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mock-dns-api
+  labels:
+    app: mock-dns-api
+    {{- include "dns-stack.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.mockDnsApi.service.type }}
+  ports:
+    - port: {{ .Values.mockDnsApi.service.port }}
+      targetPort: 8081
+      protocol: TCP
+      name: http
+  selector:
+    app: mock-dns-api

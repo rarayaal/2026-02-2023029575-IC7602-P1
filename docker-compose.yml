@@ -1,0 +1,79 @@
+# Orquestación del Stack DNS - T-38 (Rama Alexandra)
+# Nota: Orquesta los componentes funcionales existentes en la rama Alexandra:
+# 1. database (PostgreSQL + Migraciones SQL de /database/migrations)
+# 2. mock-dns-api (Servidor Mock de la API DNS en Rust)
+# 3. dns-interceptor (Interceptador DNS UDP/TCP en Rust)
+# 4. dns-ui (Interfaz Web React + Vite servida por Nginx)
+#
+# PENDIENTES DE INTEGRACIÓN (Esperando Dockerfiles de compañeros):
+# - dns-api (Luis / T-23): Pendiente entrega de Dockerfile en Java Spring Boot.
+# - health-checker (Otto / T-32): Pendiente entrega de Dockerfile en C.
+
+services:
+  # Base de Datos PostgreSQL con carga inicial de migraciones
+  database:
+    image: postgres:15-alpine
+    container_name: dns-database
+    restart: always
+    environment:
+      POSTGRES_DB: dns_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgrespassword
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./database/migrations:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d dns_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Mock de la DNS API para resolver consultas mientras se entrega dns-api en Java
+  mock-dns-api:
+    build:
+      context: ./dns-interceptor
+      dockerfile: Dockerfile
+    container_name: mock-dns-api
+    command: ./mock_dns_api
+    ports:
+      - "8081:8081"
+    environment:
+      MOCK_API_PORT: "8081"
+    restart: always
+
+  # Servidor Interceptador DNS UDP/TCP en Rust
+  dns-interceptor:
+    build:
+      context: ./dns-interceptor
+      dockerfile: Dockerfile
+    container_name: dns-interceptor
+    command: ./dns-interceptor
+    ports:
+      - "53:53/udp"
+      - "5354:5354/udp"
+    environment:
+      INTERCEPTOR_BIND_ADDR: "0.0.0.0"
+      INTERCEPTOR_UDP_PORT: "5354"
+      DNS_API_URL: "http://mock-dns-api:8081"
+      DNS_API_TIMEOUT_MS: "5000"
+      RUST_LOG: "info"
+    depends_on:
+      - mock-dns-api
+    restart: always
+
+  # Interfaz Web de Administración DNS (React + Vite + Nginx)
+  dns-ui:
+    build:
+      context: ./dns-ui
+      dockerfile: Dockerfile
+    container_name: dns-ui
+    ports:
+      - "80:80"
+    environment:
+      VITE_API_URL: "http://localhost:8081"
+    restart: always
+
+networks:
+  default:
+    name: dns_stack_network
