@@ -11,6 +11,7 @@ path = "src/main.rs"
 name = "mock_dns_api"
 path = "src/bin/mock_dns_api.rs"
 
+
 [dependencies]
 # runtime asinc para multiples peticiones UDP concurrentes
 tokio = { version = "1", features = ["full"] }

@@ -29,3 +29,11 @@ services:
       RUST_LOG: "info"
     depends_on:
       - mock-dns-api
+
+# Ejemplo para levantar con Docker Compose en desarrollo:
+#   docker-compose up -d
+#
+# Probar el Interceptor desde el host:
+#   nslookup example.com 127.0.0.1
+#   dig @127.0.0.1 example.com
+

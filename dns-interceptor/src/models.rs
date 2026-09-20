@@ -93,4 +93,3 @@ pub struct RespuestaPaisIp {
     #[serde(rename = "countryName")]
     pub nombre_pais: Option<String>,
 }
-

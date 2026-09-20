@@ -70,6 +70,7 @@ async fn procesar_paquete(
                         );
 
                         // Intenta resolver via API REST (verificar existencia + obtener registro)
+
                         match cliente_api.verificar_existencia(&pregunta.qname).await {
                             Ok(res_existe) if res_existe.existe => {
                                 // Si el dominio existe localmente, busca el mejor registro segun estrategia
@@ -150,3 +151,4 @@ async fn delegar_paquete_no_estandar(
         }
     }
 }
+
