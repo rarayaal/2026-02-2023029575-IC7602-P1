@@ -1,0 +1,31 @@
+version: "3.8"
+
+services:
+  # Mock del DNS API
+  mock-dns-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ./mock_dns_api
+    ports:
+      - "8081:8081"
+    environment:
+      MOCK_API_PORT: "8081"
+
+  # Servidor DNS Interceptor: escucha en UDP/53 o el puerto configurado
+  dns-interceptor:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ./dns-interceptor
+    ports:
+      - "53:53/udp"
+      - "5354:5354/udp"
+    environment:
+      INTERCEPTOR_BIND_ADDR: "0.0.0.0"
+      INTERCEPTOR_UDP_PORT: "5354"
+      DNS_API_URL: "http://mock-dns-api:8081"
+      DNS_API_TIMEOUT_MS: "5000"
+      RUST_LOG: "info"
+    depends_on:
+      - mock-dns-api
