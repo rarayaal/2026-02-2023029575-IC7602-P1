@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "dns-stack.fullname" . }}-dns-ui
+  labels:
+    app: dns-ui
+    {{- include "dns-stack.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dns-ui
+  template:
+    metadata:
+      labels:
+        app: dns-ui
+    spec:
+      containers:
+        - name: dns-ui
+          image: "{{ .Values.dnsUi.image.repository }}:{{ .Values.dnsUi.image.tag }}"
+          imagePullPolicy: {{ .Values.dnsUi.image.pullPolicy }}
+          ports:
+            - containerPort: 80
+          env:
+            - name: VITE_API_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "dns-stack.fullname" . }}-config
+                  key: VITE_API_URL
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "dns-stack.fullname" . }}-dns-ui
+  labels:
+    app: dns-ui
+    {{- include "dns-stack.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.dnsUi.service.type }}
+  ports:
+    - port: {{ .Values.dnsUi.service.port }}
+      targetPort: 80
+      protocol: TCP
+      name: http
+  selector:
+    app: dns-ui

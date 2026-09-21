@@ -3,6 +3,15 @@ name = "dns-interceptor"
 version = "0.1.0"
 edition = "2021"
 
+[[bin]]
+name = "dns-interceptor"
+path = "src/main.rs"
+
+[[bin]]
+name = "mock_dns_api"
+path = "src/bin/mock_dns_api.rs"
+
+
 [dependencies]
 # runtime asinc para multiples peticiones UDP concurrentes
 tokio = { version = "1", features = ["full"] }

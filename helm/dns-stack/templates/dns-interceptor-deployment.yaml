@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "dns-stack.fullname" . }}-dns-interceptor
+  labels:
+    app: dns-interceptor
+    {{- include "dns-stack.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dns-interceptor
+  template:
+    metadata:
+      labels:
+        app: dns-interceptor
+    spec:
+      containers:
+        - name: dns-interceptor
+          image: "{{ .Values.dnsInterceptor.image.repository }}:{{ .Values.dnsInterceptor.image.tag }}"
+          imagePullPolicy: {{ .Values.dnsInterceptor.image.pullPolicy }}
+          command: ["./dns-interceptor"]
+          ports:
+            - containerPort: 5354
+              protocol: UDP
+            - containerPort: 53
+              protocol: UDP
+          env:
+            - name: INTERCEPTOR_BIND_ADDR
+              value: "0.0.0.0"
+            - name: INTERCEPTOR_UDP_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "dns-stack.fullname" . }}-config
+                  key: INTERCEPTOR_UDP_PORT
+            - name: DNS_API_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "dns-stack.fullname" . }}-config
+                  key: DNS_API_URL
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "dns-stack.fullname" . }}-dns-interceptor
+  labels:
+    app: dns-interceptor
+    {{- include "dns-stack.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.dnsInterceptor.service.type }}
+  ports:
+    - port: {{ .Values.dnsInterceptor.service.udpPort }}
+      targetPort: 5354
+      protocol: UDP
+      name: dns-udp
+  selector:
+    app: dns-interceptor
