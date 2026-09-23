@@ -1,80 +1,95 @@
-// modelos de datos para hablar con la DNS API en formato JSON
+// modelos de datos para hablar con la DNS API en formato JSON según docs/contrato-dns-api.md
 
 use serde::{Deserialize, Serialize};
 
-// respuesta del GET api exists para ver si el dominio existe
+/// Respuesta del GET /api/exists
 #[derive(Debug, Clone, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
 pub struct RespuestaExiste {
-    // verdadero si el dominio esta en la base de datos
+    /// verdadero si el dominio existe y está activo
+    #[serde(rename = "exists")]
     pub existe: bool,
-    // nombre de host consultado
+    /// nombre de host consultado (normalizado)
     pub hostname: String,
-    // tipo de registro como single multi weight geo roundtrip o None si no existe
+    /// tipo de registro: "single", "multi", "weight", "geo", "round-trip" o None si no existe
+    #[serde(rename = "type")]
     pub tipo: Option<String>,
 }
 
-// representa una IP de destino asociada a un dominio
+/// Representa una IP de destino (target) asociada a un dominio
 #[derive(Debug, Clone, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
 pub struct DestinoDns {
-    // id unico del destino
+    /// ID único del destino asignado por la BD
     pub id: Option<String>,
-    // direccion IP v4 de la maquina
+    /// Dirección IPv4 de destino
     pub ip: String,
-    // peso para el balanceo probabilistico
+    /// Peso relativo para balanceo probabilístico (estrategia weight)
+    #[serde(rename = "weight")]
     pub peso: Option<u32>,
-    // codigo del pais de dos letras para el ruteo por zona
+    /// Código ISO de país (2 letras) para ruteo geográfico (estrategia geo)
+    #[serde(rename = "country")]
     pub pais: Option<String>,
-    // estado reportado por el monitor de salud
+    /// Estado reportado por el Health Checker ("healthy", "unhealthy", "unknown")
+    #[serde(rename = "status")]
     pub estado: Option<String>,
-    // latencia en milisegundos para la estrategia roundtrip
+    /// ID del health check configurado para esta IP
+    #[serde(rename = "healthCheckId")]
+    pub health_check_id: Option<String>,
+    /// Latencia promedio RTT en ms (estrategia round-trip)
+    #[serde(rename = "avgRttMs")]
     pub latencia_promedio_ms: Option<f64>,
+    /// Latencia mínima RTT en ms
+    #[serde(rename = "minRttMs")]
+    pub min_rtt_ms: Option<f64>,
+    /// Fecha de la última prueba de salud realizada
+    #[serde(rename = "lastCheckAt")]
+    pub last_check_at: Option<String>,
 }
 
 impl DestinoDns {
-    // revisa si la IP esta buena para mandarle trafico
+    /// Revisa si la IP está saludable para enviarle tráfico
     pub fn esta_sano(&self) -> bool {
         match self.estado.as_deref() {
             Some("healthy") => true,
             Some("unhealthy") => false,
-            _ => true, // si no se sabe se asume buena por defecto
+            _ => true, // si no se sabe ("unknown" o None), se asume buena por defecto
         }
     }
 }
 
-// registro DNS completo traido desde la API en Java
+/// Registro DNS completo retornado por el DNS API
 #[derive(Debug, Clone, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
 pub struct RegistroDns {
-    // id del registro
+    /// ID único del registro
     pub id: Option<String>,
-    // nombre del dominio
+    /// Nombre de dominio (ej. "api.company.com")
+    #[serde(rename = "domain")]
     pub dominio: String,
-    // estrategia de resolucion configurada
+    /// Estrategia de resolución ("single", "multi", "weight", "geo", "round-trip")
+    #[serde(rename = "type")]
     pub tipo: String,
-    // tiempo de vida TTL en segundos
+    /// Time to Live en segundos
     pub ttl: u32,
-    // indica si el registro esta activo
+    /// Indica si el registro está activo en el sistema
+    #[serde(rename = "isActive")]
     pub esta_activo: bool,
-    // lista de destinos o IPs asociadas
+    /// Lista de destinos (targets) asociados
+    #[serde(rename = "targets")]
     pub destinos: Vec<DestinoDns>,
 }
 
-// paquete DNS binario metido en BASE64 para enviar a la API
+/// Paquete DNS binario en BASE64 enviado a /api/dns_resolver
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct PaqueteDnsBase64 {
-    // paquete en BASE64
     pub data: String,
 }
 
-// respuesta del servicio de ubicacion por IP
+/// Respuesta del servicio IP-to-Country (/api/ip-country/lookup?ip=...)
 #[allow(dead_code)]
 #[derive(Debug, Clone, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
 pub struct RespuestaPaisIp {
-    // codigo del pais
+    pub ip: Option<String>,
+    #[serde(rename = "countryCode")]
     pub codigo_pais: Option<String>,
-    // nombre del pais
+    #[serde(rename = "countryName")]
     pub nombre_pais: Option<String>,
 }

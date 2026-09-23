@@ -69,7 +69,8 @@ async fn procesar_paquete(
                             pregunta.qclass
                         );
 
-                        // Intenta resolver via API REST (P2: verificar existencia + obtener registro)
+                        // Intenta resolver via API REST (verificar existencia + obtener registro)
+
                         match cliente_api.verificar_existencia(&pregunta.qname).await {
                             Ok(res_existe) if res_existe.existe => {
                                 // Si el dominio existe localmente, busca el mejor registro segun estrategia

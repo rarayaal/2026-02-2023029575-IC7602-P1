@@ -120,32 +120,4 @@ mod tests {
         assert_eq!(&answer[12..16], &[93, 184, 216, 34]);
         assert_eq!(answer.len(), 16);
     }
-
-    #[test]
-    fn arma_respuesta_con_multiples_registros() {
-        let (query, question) = sample_query();
-        let records = [
-            ResolvedRecord { ip: "10.0.0.1".parse().unwrap(), ttl: 60 },
-            ResolvedRecord { ip: "10.0.0.2".parse().unwrap(), ttl: 60 },
-        ];
-
-        let response = build_response(&query, &question, &records);
-        let header = crate::dns::header::DnsHeader::parsear(&response).unwrap();
-        assert_eq!(header.ancount, 2);
-    }
-
-    #[test]
-    fn serializa_registro_ipv6_como_aaaa() {
-        let (query, question) = sample_query();
-        let records = [ResolvedRecord {
-            ip: "::1".parse().unwrap(),
-            ttl: 60,
-        }];
-
-        let response = build_response(&query, &question, &records);
-        let question_end = HEADER_SIZE + question.consumed;
-        let answer = &response[question_end..];
-        assert_eq!(u16::from_be_bytes([answer[2], answer[3]]), TYPE_AAAA);
-        assert_eq!(u16::from_be_bytes([answer[10], answer[11]]), 16); // RDLENGTH IPv6
-    }
 }

@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "dns-stack.fullname" . }}-config
+  labels:
+    {{- include "dns-stack.labels" . | nindent 4 }}
+data:
+  POSTGRES_DB: {{ .Values.database.env.postgresDb | quote }}
+  POSTGRES_USER: {{ .Values.database.env.postgresUser | quote }}
+  MOCK_API_PORT: {{ .Values.mockDnsApi.env.port | quote }}
+  INTERCEPTOR_UDP_PORT: {{ .Values.dnsInterceptor.env.udpPort | quote }}
+  DNS_API_URL: {{ .Values.dnsInterceptor.env.dnsApiUrl | quote }}
+  VITE_API_URL: {{ .Values.dnsUi.env.apiUrl | quote }}

@@ -6,14 +6,11 @@ use super::question::Question;
 pub enum PacketKind {
     /// QR=0 y OPCODE=0: se resuelve localmente contra los registros del equipo (vía DNS API).
     StandardQuery,
-    /// Cualquier otro caso: se delega íntegro (BASE64/HTTPS) al DNS API (aun no existe).
+    /// Cualquier otro caso: se delega íntegro (BASE64/HTTPS) al DNS API.
     NonStandard,
 }
 
 /// Un mensaje DNS recibido: header ya parseado + bytes crudos completos.
-///
-/// Conservamos `raw` porque, para paquetes no estándar, el paquete completo se reenvía tal cual
-/// (codificado en BASE64) al DNS API — no hace falta reconstruirlo desde los campos parseados.
 #[derive(Debug)]
 pub struct DnsMessage {
     pub header: DnsHeader,
@@ -21,14 +18,14 @@ pub struct DnsMessage {
 }
 
 impl DnsMessage {
-    /// Parsea únicamente el header, lo demas se parsea en futuros feats.
+    /// Parsea únicamente el header, lo demás se parsea en módulos dedicados.
     pub fn parse(raw: Vec<u8>) -> Result<Self, DnsParseError> {
-        let header = DnsHeader::parsear(&raw)?;
+        let header = DnsHeader::parse(&raw)?;
         Ok(Self { header, raw })
     }
 
     pub fn classify(&self) -> PacketKind {
-        if self.header.es_consulta_estandar() {
+        if self.header.is_standard_query() {
             PacketKind::StandardQuery
         } else {
             PacketKind::NonStandard
@@ -40,8 +37,7 @@ impl DnsMessage {
         &self.raw[HEADER_SIZE..]
     }
 
-    /// Parsea la primera Question del mensaje (hostname + QTYPE + QCLASS). Se parsean aqui los estandar
-    /// los no estándar se reenvían crudos al DNS API.
+    /// Parsea la sección Question a partir de los bytes del cuerpo.
     pub fn question(&self) -> Result<Question, DnsParseError> {
         Question::parse(self.body())
     }
@@ -59,7 +55,7 @@ mod tests {
     fn clasifica_query_estandar_correctamente() {
         let msg = DnsMessage::parse(STANDARD_QUERY.to_vec()).unwrap();
         assert_eq!(msg.classify(), PacketKind::StandardQuery);
-        assert!(msg.body().is_empty()); // no hay Question en este ejemplo, solo header
+        assert!(msg.body().is_empty());
     }
 
     #[test]

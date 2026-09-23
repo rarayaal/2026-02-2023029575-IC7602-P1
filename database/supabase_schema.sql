@@ -198,8 +198,8 @@ COMMENT ON COLUMN health_check_results.error_message IS 'Descripción del fallo 
 COMMENT ON COLUMN health_check_results.checked_at IS 'Marca de tiempo en que finalizó la prueba';
 -- <<< FIN MIGRACIÓN: 06_health_check_results.sql <<<
 
--- >>> INICIO MIGRACIÓN: 07_consensus_majority.sql >>>
--- View: Último reporte de salud de cada target por cada instancia activa
+-- >>> INICIO MIGRACIÓN: 07_consensus_majority.sql (Refinada en 09_consensus_refinement.sql) >>>
+-- View: Último reporte de salud de cada target por cada instancia activa y no obsoleta
 CREATE OR REPLACE VIEW view_latest_instance_health AS
 SELECT DISTINCT ON (hcr.target_id, hcr.instance_id)
     hcr.target_id,
@@ -211,6 +211,8 @@ SELECT DISTINCT ON (hcr.target_id, hcr.instance_id)
 FROM health_check_results hcr
 JOIN checker_instances ci ON ci.instance_id = hcr.instance_id
 WHERE ci.is_active = TRUE
+  AND ci.last_heartbeat >= (NOW() - INTERVAL '2 minutes')
+  AND hcr.checked_at >= (NOW() - INTERVAL '5 minutes')
 ORDER BY hcr.target_id, hcr.instance_id, hcr.checked_at DESC;
 
 -- View: Consenso de Mayoría Simple por cada target
@@ -263,7 +265,7 @@ DECLARE
     v_healthy_votes INTEGER;
     v_new_status BOOLEAN;
 BEGIN
-    -- Contar votos de la última evaluación de cada instancia activa
+    -- Contar votos de la última evaluación de cada instancia activa y reciente
     SELECT 
         COUNT(*),
         COUNT(*) FILTER (WHERE status = 'healthy')
