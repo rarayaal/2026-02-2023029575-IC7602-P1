@@ -2,6 +2,7 @@ package dnsapi.http;
 
 import dnsapi.config.ApiConfig;
 import dnsapi.dns.UdpDnsClient;
+import dnsapi.ipcountry.IpCountryRepository;
 import dnsapi.records.DnsRecordRepository;
 import io.javalin.Javalin;
 import io.javalin.http.HttpStatus;
@@ -26,21 +27,22 @@ public final class ApiServer {
     private final ApiConfig config;
     private final Javalin app;
 
-    public ApiServer(ApiConfig config, DnsRecordRepository records, UdpDnsClient dnsClient) {
+    public ApiServer(ApiConfig config, DnsRecordRepository records, IpCountryRepository ranges, UdpDnsClient dnsClient) {
         this.config = config;
         this.app = Javalin.create(javalin -> {
             javalin.showJavalinBanner = false;
             javalin.jetty.threadPool = new QueuedThreadPool(config.maxThreads());
         });
-        registerRoutes(records, dnsClient);
+        registerRoutes(records, ranges, dnsClient);
     }
 
-    private void registerRoutes(DnsRecordRepository records, UdpDnsClient dnsClient) {
+    private void registerRoutes(DnsRecordRepository records, IpCountryRepository ranges, UdpDnsClient dnsClient) {
         // Endpoint de vida: lo usan Docker Compose y Kubernetes para saber si el contenedor sirve.
         app.get("/api/health", ctx -> ctx.json(Map.of("status", "ok", "component", "dns-api")));
 
         new ExistsController(records).register(app);
         new RecordsController(records).register(app);
+        new IpCountryController(ranges).register(app);
         new DnsResolverController(dnsClient).register(app);
 
         registerErrorHandlers();
@@ -51,6 +53,10 @@ public final class ApiServer {
         // Se atrapa EndpointNotFound, que Javalin lanza solo cuando ninguna ruta coincide. Un
         // app.error(404) se ejecutaria tambien cuando un endpoint responde 404 a proposito, como
         // un registro que no existe, y le pisaria su mensaje.
+        app.exception(InvalidRequestException.class, (exception, ctx) ->
+                ctx.status(HttpStatus.BAD_REQUEST)
+                        .json(new ErrorResponse(exception.code(), exception.getMessage())));
+
         app.exception(EndpointNotFound.class, (exception, ctx) ->
                 ctx.status(HttpStatus.NOT_FOUND)
                         .json(new ErrorResponse("not_found", "No existe la ruta " + ctx.path())));
