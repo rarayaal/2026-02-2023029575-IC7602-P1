@@ -1,6 +1,7 @@
 package dnsapi.http;
 
 import dnsapi.config.ApiConfig;
+import dnsapi.dns.UdpDnsClient;
 import dnsapi.records.DnsRecordRepository;
 import io.javalin.Javalin;
 import io.javalin.http.HttpStatus;
@@ -25,21 +26,22 @@ public final class ApiServer {
     private final ApiConfig config;
     private final Javalin app;
 
-    public ApiServer(ApiConfig config, DnsRecordRepository records) {
+    public ApiServer(ApiConfig config, DnsRecordRepository records, UdpDnsClient dnsClient) {
         this.config = config;
         this.app = Javalin.create(javalin -> {
             javalin.showJavalinBanner = false;
             javalin.jetty.threadPool = new QueuedThreadPool(config.maxThreads());
         });
-        registerRoutes(records);
+        registerRoutes(records, dnsClient);
     }
 
-    private void registerRoutes(DnsRecordRepository records) {
+    private void registerRoutes(DnsRecordRepository records, UdpDnsClient dnsClient) {
         // Endpoint de vida: lo usan Docker Compose y Kubernetes para saber si el contenedor sirve.
         app.get("/api/health", ctx -> ctx.json(Map.of("status", "ok", "component", "dns-api")));
 
         new ExistsController(records).register(app);
         new RecordsController(records).register(app);
+        new DnsResolverController(dnsClient).register(app);
 
         registerErrorHandlers();
     }
