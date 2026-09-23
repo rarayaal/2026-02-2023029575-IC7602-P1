@@ -2,6 +2,7 @@ package dnsapi.http;
 
 import dnsapi.config.ApiConfig;
 import dnsapi.dns.UdpDnsClient;
+import dnsapi.healthchecks.HealthCheckRepository;
 import dnsapi.ipcountry.IpCountryRepository;
 import dnsapi.records.DnsRecordRepository;
 import io.javalin.Javalin;
@@ -27,22 +28,25 @@ public final class ApiServer {
     private final ApiConfig config;
     private final Javalin app;
 
-    public ApiServer(ApiConfig config, DnsRecordRepository records, IpCountryRepository ranges, UdpDnsClient dnsClient) {
+    public ApiServer(ApiConfig config, DnsRecordRepository records, IpCountryRepository ranges,
+                     HealthCheckRepository checks, UdpDnsClient dnsClient) {
         this.config = config;
         this.app = Javalin.create(javalin -> {
             javalin.showJavalinBanner = false;
             javalin.jetty.threadPool = new QueuedThreadPool(config.maxThreads());
         });
-        registerRoutes(records, ranges, dnsClient);
+        registerRoutes(records, ranges, checks, dnsClient);
     }
 
-    private void registerRoutes(DnsRecordRepository records, IpCountryRepository ranges, UdpDnsClient dnsClient) {
+    private void registerRoutes(DnsRecordRepository records, IpCountryRepository ranges,
+                                HealthCheckRepository checks, UdpDnsClient dnsClient) {
         // Endpoint de vida: lo usan Docker Compose y Kubernetes para saber si el contenedor sirve.
         app.get("/api/health", ctx -> ctx.json(Map.of("status", "ok", "component", "dns-api")));
 
         new ExistsController(records).register(app);
         new RecordsController(records).register(app);
         new IpCountryController(ranges).register(app);
+        new HealthChecksController(checks).register(app);
         new DnsResolverController(dnsClient).register(app);
 
         registerErrorHandlers();

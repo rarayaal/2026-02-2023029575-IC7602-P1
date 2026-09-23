@@ -3,6 +3,8 @@ package dnsapi;
 import dnsapi.config.ApiConfig;
 import dnsapi.config.ConfigurationException;
 import dnsapi.dns.UdpDnsClient;
+import dnsapi.healthchecks.HealthCheckRepository;
+import dnsapi.healthchecks.SupabaseHealthCheckRepository;
 import dnsapi.ipcountry.IpCountryRepository;
 import dnsapi.ipcountry.SupabaseIpCountryRepository;
 import dnsapi.http.ApiServer;
@@ -33,12 +35,13 @@ public final class Main {
 
             DnsRecordRepository records = new SupabaseDnsRecordRepository(supabase);
             IpCountryRepository ranges = new SupabaseIpCountryRepository(supabase);
+            HealthCheckRepository checks = new SupabaseHealthCheckRepository(supabase);
 
             UdpDnsClient dnsClient = new UdpDnsClient(
                     config.dnsServerIp(), config.dnsServerPort(), config.dnsTimeoutMillis());
             log.info("Las consultas delegadas se resolveran contra {}", dnsClient.target());
 
-            ApiServer server = new ApiServer(config, records, ranges, dnsClient);
+            ApiServer server = new ApiServer(config, records, ranges, checks, dnsClient);
             // Para que Docker pueda detener el contenedor sin matar peticiones a medio atender.
             Runtime.getRuntime().addShutdownHook(new Thread(server::stop, "dns-api-shutdown"));
             server.start();
