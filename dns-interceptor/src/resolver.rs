@@ -126,7 +126,10 @@ mod tests {
             peso: Some(peso),
             pais: None,
             estado: Some(estado.to_string()),
+            health_check_id: None,
             latencia_promedio_ms: Some(latencia),
+            min_rtt_ms: None,
+            last_check_at: None,
         }
     }
 
