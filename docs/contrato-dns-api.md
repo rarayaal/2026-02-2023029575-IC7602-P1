@@ -352,9 +352,16 @@ GET /api/ip-country/lookup?ip=190.113.4.20
 {
   "ip": "190.113.4.20",
   "countryCode": "CR",
-  "countryName": "Costa Rica"
+  "countryName": "Costa Rica",
+  "city": "San José",
+  "latitude": 9.9281,
+  "longitude": -84.0907
 }
 ```
+
+`city`, `latitude` y `longitude` aparecen solo si el rango los tiene cargados. Sirven para la
+estrategia `round-trip`: con ellos se estima dónde está el cliente y se compara con la ubicación de
+cada Health Checker.
 
 Si la IP no cae en ningún rango, responde `200` con `countryCode` y `countryName` en `null`, por la
 misma razón que `/api/exists`: no encontrarla es una respuesta válida. Si falta el parámetro `ip` o

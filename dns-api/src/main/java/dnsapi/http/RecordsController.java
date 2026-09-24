@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import dnsapi.records.DnsRecord;
 import dnsapi.records.DnsRecordRepository;
 import dnsapi.records.DnsTarget;
+import dnsapi.ipcountry.Ipv4;
 import dnsapi.records.DuplicateDomainException;
 import dnsapi.records.RecordType;
 import io.javalin.Javalin;
@@ -47,16 +48,6 @@ public final class RecordsController {
     public record TargetRequest(String id, String ip, Integer weight, String country) {
     }
 
-    /** El cuerpo o los parametros no cumplen el contrato. Se responde {@code 400}. */
-    static final class InvalidRequestException extends RuntimeException {
-        private final String code;
-
-        InvalidRequestException(String code, String message) {
-            super(message);
-            this.code = code;
-        }
-    }
-
     public void register(Javalin app) {
         app.get(PATH, this::list);
         app.get(PATH + "/{id}", this::get);
@@ -64,8 +55,6 @@ public final class RecordsController {
         app.put(PATH + "/{id}", this::update);
         app.delete(PATH + "/{id}", this::delete);
 
-        app.exception(InvalidRequestException.class, (e, ctx) ->
-                ctx.status(HttpStatus.BAD_REQUEST).json(new ErrorResponse(e.code, e.getMessage())));
         app.exception(DuplicateDomainException.class, (e, ctx) ->
                 ctx.status(HttpStatus.CONFLICT).json(new ErrorResponse("duplicate_domain", e.getMessage())));
     }
@@ -174,7 +163,7 @@ public final class RecordsController {
     }
 
     private static DnsTarget validateTarget(RecordType type, TargetRequest target) {
-        if (target == null || !isIpv4(target.ip())) {
+        if (target == null || !Ipv4.isValid(target.ip())) {
             String ip = target == null ? null : target.ip();
             throw new InvalidRequestException("invalid_body", "IP invalida en 'targets': " + ip);
         }
@@ -207,23 +196,6 @@ public final class RecordsController {
             throw new InvalidRequestException("invalid_type",
                     "Tipo de registro desconocido: " + text + ". Validos: single, multi, weight, geo, round-trip");
         }
-    }
-
-    /** Una IPv4 en notacion de puntos: cuatro numeros de 0 a 255. */
-    private static boolean isIpv4(String ip) {
-        if (ip == null) {
-            return false;
-        }
-        String[] octets = ip.trim().split("\\.", -1);
-        if (octets.length != 4) {
-            return false;
-        }
-        for (String octet : octets) {
-            if (!octet.matches("\\d{1,3}") || Integer.parseInt(octet) > 255) {
-                return false;
-            }
-        }
-        return true;
     }
 
     private static boolean blank(String value) {
