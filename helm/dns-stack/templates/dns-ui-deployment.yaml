@@ -1,3 +1,4 @@
+{{- if .Values.dnsUi.enabled }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -21,6 +22,7 @@ spec:
           imagePullPolicy: {{ .Values.dnsUi.image.pullPolicy }}
           ports:
             - containerPort: 80
+              name: http
           env:
             - name: VITE_API_URL
               valueFrom:
@@ -31,7 +33,7 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "dns-stack.fullname" . }}-dns-ui
+  name: dns-ui
   labels:
     app: dns-ui
     {{- include "dns-stack.labels" . | nindent 4 }}
@@ -44,3 +46,4 @@ spec:
       name: http
   selector:
     app: dns-ui
+{{- end }}

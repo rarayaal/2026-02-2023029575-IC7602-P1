@@ -1,100 +1,112 @@
-import { MOCK_DNS_RECORDS } from '../mocks/dnsRecords';
-
-// Capa de abstracción del servicio DNS basada en datos MOCK (según contrato docs/contrato-dns-api.md)
-
-let recordsState = JSON.parse(JSON.stringify(MOCK_DNS_RECORDS));
+// Capa de servicio DNS conectada al DNS API Java (T-33 / T-34)
+const API_BASE_URL = import.meta.env.VITE_API_URL || '';
 
 export const dnsService = {
   /**
-   * Obtiene la lista completa de registros DNS
+   * Obtiene la lista completa de registros DNS desde el DNS API Java
    */
-  async getRecords() {
-    return Promise.resolve(JSON.parse(JSON.stringify(recordsState)));
+  async getRecords(domain = '', type = '') {
+    let url = `${API_BASE_URL}/api/records`;
+    const params = new URLSearchParams();
+    if (domain) params.append('domain', domain);
+    if (type && type !== 'all') params.append('type', type);
+    if (params.toString()) {
+      url += `?${params.toString()}`;
+    }
+
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Error ${response.status}: No se pudieron obtener los registros DNS`);
+    }
+    return await response.json();
   },
 
   /**
    * Obtiene un registro DNS por su ID
    */
   async getRecordById(id) {
-    const record = recordsState.find((r) => r.id === id);
-    return Promise.resolve(record ? JSON.parse(JSON.stringify(record)) : null);
+    const response = await fetch(`${API_BASE_URL}/api/records/${id}`);
+    if (!response.ok) {
+      if (response.status === 404) return null;
+      throw new Error(`Error ${response.status}: No se pudo obtener el registro DNS`);
+    }
+    return await response.json();
   },
 
   /**
-   * Crea un nuevo registro DNS en el estado local según el contrato.
-   * El payload no recibe 'id' ni 'status' de solo lectura.
+   * Crea un nuevo registro DNS enviando el payload según el contrato
    */
   async createRecord(newRecordData) {
-    const existingIds = recordsState.map((r) => {
-      const match = r.id && r.id.match(/\d+/);
-      return match ? parseInt(match[0], 10) : 0;
-    });
-    const maxId = existingIds.length > 0 ? Math.max(...existingIds) : 0;
-    const nextNumber = maxId + 1;
-    const newId = `DNS-${String(nextNumber).padStart(3, '0')}`;
-
-    // Asegurar que cada target tenga su ID local y estado inicial sin monitorear 'unknown' para lectura
-    const formattedTargets = (newRecordData.targets || []).map((target, idx) => ({
-      id: target.id || `t-${newId.toLowerCase()}-${idx + 1}`,
-      status: target.status || 'unknown',
-      healthCheckId: target.healthCheckId || null,
-      ...target,
-    }));
-
-    const createdRecord = {
-      id: newId,
-      domain: newRecordData.domain,
+    const payload = {
+      domain: newRecordData.domain ? newRecordData.domain.trim().toLowerCase() : '',
       type: newRecordData.type,
-      ttl: Number(newRecordData.ttl),
-      isActive: newRecordData.isActive !== undefined ? newRecordData.isActive : true,
-      targets: formattedTargets,
+      ttl: Number(newRecordData.ttl || 300),
+      isActive: newRecordData.isActive !== undefined ? Boolean(newRecordData.isActive) : true,
+      targets: (newRecordData.targets || []).map((t) => ({
+        ip: t.ip ? t.ip.trim() : '',
+        weight: t.weight ? Number(t.weight) : undefined,
+        country: t.country ? t.country.trim().toUpperCase() : undefined,
+      })),
     };
 
-    recordsState.push(createdRecord);
-    return Promise.resolve(JSON.parse(JSON.stringify(createdRecord)));
+    const response = await fetch(`${API_BASE_URL}/api/records`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const errData = await response.json().catch(() => ({}));
+      throw new Error(errData.message || `Error ${response.status}: No se pudo crear el registro DNS`);
+    }
+
+    return await response.json();
   },
 
   /**
    * Actualiza un registro DNS existente
    */
   async updateRecord(id, updatedData) {
-    const index = recordsState.findIndex((r) => r.id === id);
-    if (index === -1) {
-      return Promise.reject(new Error(`Registro con ID ${id} no encontrado`));
-    }
-
-    const currentRecord = recordsState[index];
-
-    // Preservar estado e IDs de targets existentes si no se envían nuevos
-    const updatedTargets = (updatedData.targets || []).map((target, idx) => {
-      const existingTarget = (currentRecord.targets || [])[idx] || {};
-      return {
-        id: target.id || existingTarget.id || `t-${id.toLowerCase()}-${idx + 1}`,
-        status: existingTarget.status || 'unknown',
-        healthCheckId: existingTarget.healthCheckId || null,
-        ...target,
-      };
-    });
-
-    recordsState[index] = {
-      ...currentRecord,
-      domain: updatedData.domain !== undefined ? updatedData.domain : currentRecord.domain,
-      type: updatedData.type !== undefined ? updatedData.type : currentRecord.type,
-      ttl: updatedData.ttl !== undefined ? Number(updatedData.ttl) : currentRecord.ttl,
-      isActive: updatedData.isActive !== undefined ? updatedData.isActive : currentRecord.isActive,
-      targets: updatedTargets,
+    const payload = {
+      domain: updatedData.domain ? updatedData.domain.trim().toLowerCase() : '',
+      type: updatedData.type,
+      ttl: updatedData.ttl !== undefined ? Number(updatedData.ttl) : 300,
+      isActive: updatedData.isActive !== undefined ? Boolean(updatedData.isActive) : true,
+      targets: (updatedData.targets || []).map((t) => ({
+        id: t.id,
+        ip: t.ip ? t.ip.trim() : '',
+        weight: t.weight ? Number(t.weight) : undefined,
+        country: t.country ? t.country.trim().toUpperCase() : undefined,
+      })),
     };
 
-    return Promise.resolve(JSON.parse(JSON.stringify(recordsState[index])));
+    const response = await fetch(`${API_BASE_URL}/api/records/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const errData = await response.json().catch(() => ({}));
+      throw new Error(errData.message || `Error ${response.status}: No se pudo actualizar el registro DNS`);
+    }
+
+    return await response.json();
   },
 
   /**
    * Elimina un registro DNS por ID
    */
   async deleteRecord(id) {
-    const initialLength = recordsState.length;
-    recordsState = recordsState.filter((r) => r.id !== id);
-    const success = recordsState.length < initialLength;
-    return Promise.resolve(success);
+    const response = await fetch(`${API_BASE_URL}/api/records/${id}`, {
+      method: 'DELETE',
+    });
+
+    if (!response.ok && response.status !== 204) {
+      throw new Error(`Error ${response.status}: No se pudo eliminar el registro DNS`);
+    }
+
+    return true;
   },
 };
+
