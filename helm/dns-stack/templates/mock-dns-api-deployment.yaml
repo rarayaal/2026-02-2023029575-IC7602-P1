@@ -1,3 +1,4 @@
+{{- if .Values.mockDnsApi.enabled }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -22,6 +23,7 @@ spec:
           command: ["./mock_dns_api"]
           ports:
             - containerPort: 8081
+              name: http
           env:
             - name: MOCK_API_PORT
               valueFrom:
@@ -45,3 +47,4 @@ spec:
       name: http
   selector:
     app: mock-dns-api
+{{- end }}

@@ -52,6 +52,8 @@ services:
       DNS_SERVER_IP: "8.8.8.8"
       DNS_SERVER_PORT: "53"
       DNS_TIMEOUT_MS: "3000"
+    depends_on:
+      - supabase-rest
     healthcheck:
       # wget viene incluido en la imagen base alpine, no hay que instalar nada.
       test: ["CMD-SHELL", "wget -q -O- http://localhost:8080/api/health || exit 1"]
@@ -70,13 +72,14 @@ services:
     command: ./dns-interceptor
     ports:
       - "53:53/udp"
-      - "5354:5354/udp"
+
     environment:
       INTERCEPTOR_BIND_ADDR: "0.0.0.0"
-      INTERCEPTOR_UDP_PORT: "5354"
+      INTERCEPTOR_UDP_PORT: "53"
       DNS_API_URL: "http://dns-api:8080"
       DNS_API_TIMEOUT_MS: "5000"
       RUST_LOG: "info"
+
     depends_on:
       dns-api:
         condition: service_healthy
@@ -91,7 +94,9 @@ services:
     ports:
       - "80:80"
     environment:
-      VITE_API_URL: "http://localhost:8080"
+      VITE_API_URL: ""
+    depends_on:
+      - dns-api
     restart: always
 
 networks:
