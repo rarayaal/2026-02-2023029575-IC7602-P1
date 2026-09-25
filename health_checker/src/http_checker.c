@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 /* Tabla de caracteres Base64 segun RFC 4648 */
 static const char b64_table[] =
@@ -108,13 +109,20 @@ http_check_single_attempt(const char *ip_address, int port, const char *path,
     }
   }
 
+  struct timespec start_time, end_time;
+  clock_gettime(CLOCK_MONOTONIC, &start_time);
+
   CURLcode res = curl_easy_perform(curl);
+
+  clock_gettime(CLOCK_MONOTONIC, &end_time);
 
   if (res == CURLE_OK) {
     curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &result.http_status);
-    double total_time_sec = 0.0;
-    curl_easy_getinfo(curl, CURLINFO_TOTAL_TIME, &total_time_sec);
-    result.rtt_ms = total_time_sec * 1000.0;
+
+    /* Calculo de RTT en milisegundos con alta resolucion */
+    double diff_sec = (double)(end_time.tv_sec - start_time.tv_sec);
+    double diff_nsec = (double)(end_time.tv_nsec - start_time.tv_nsec);
+    result.rtt_ms = (diff_sec * 1000.0) + (diff_nsec / 1e6);
 
     if (is_status_expected(result.http_status, expected_statuses,
                            expected_statuses_count)) {

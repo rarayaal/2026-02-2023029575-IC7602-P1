@@ -13,4 +13,16 @@ typedef struct {
  */
 TargetNode *supabase_fetch_active_targets(const SupabaseConfig *config);
 
+/* Registra o actualiza el heartbeat y ubicacion de la instancia actual */
+bool supabase_register_heartbeat(const SupabaseConfig *config,
+                                 const char *instance_id,
+                                 const char *country_code, const char *city,
+                                 double latitude, double longitude);
+
+/* Envia una medicion de health check a Supabase para evaluar el consenso */
+bool supabase_post_check_result(const SupabaseConfig *config,
+                                const char *instance_id, const char *target_id,
+                                bool is_healthy, double rtt_ms, long http_code,
+                                const char *error_message);
+
 #endif /* SUPABASE_CLIENT_H */
