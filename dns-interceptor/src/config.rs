@@ -23,10 +23,10 @@ impl Configuracion {
             .and_then(|v| v.parse::<u16>().ok())
             .unwrap_or(5353);
 
-        // Si se provee DNS_API_URL explícita se respeta; de lo contrario se arma con HOST y PORT o mock por omisión
+        // Si se provee DNS_API_URL explícita se respeta; de lo contrario se arma con HOST y PORT.
         let url_api_dns = env::var("DNS_API_URL").unwrap_or_else(|_| {
             let host_api = env::var("DNS_API_HOST").unwrap_or_else(|_| "localhost".to_string());
-            let puerto_api = env::var("DNS_API_PORT").unwrap_or_else(|_| "8081".to_string());
+            let puerto_api = env::var("DNS_API_PORT").unwrap_or_else(|_| "8080".to_string());
             let esquema_api = env::var("DNS_API_SCHEME").unwrap_or_else(|_| "http".to_string());
             format!("{esquema_api}://{host_api}:{puerto_api}")
         });

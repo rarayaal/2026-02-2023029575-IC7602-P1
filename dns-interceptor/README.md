@@ -4,8 +4,8 @@
 
 El **DNS Interceptor** es un servidor DNS que actúa como punto de entrada del sistema. Escucha en UDP/53 (o puerto configurable), recibe queries DNS, y decide si resolverlos localmente o delegarlos al DNS API.
 
-- **Desarrollo local:** levanta el Interceptor + mock_dns_api con Docker Compose.
-- **Integración real:** apunta la variable `DNS_API_URL` al DNS API real.
+- **Desarrollo aislado:** levanta el Interceptor + mock_dns_api con el Docker Compose de este directorio.
+- **Integración real:** usa el Docker Compose de la raíz, que conecta el Interceptor con `dns-api:8080`.
 
 ---
 
@@ -66,7 +66,7 @@ docker-compose down
 docker run --rm -p 53:53/udp \
   -e INTERCEPTOR_BIND_ADDR=0.0.0.0 \
   -e INTERCEPTOR_UDP_PORT=53 \
-  -e DNS_API_URL=http://localhost:8081 \
+  -e DNS_API_URL=http://localhost:8080 \
   -e RUST_LOG=info \
   dns-interceptor:latest
 ```
@@ -79,7 +79,7 @@ docker run --rm -p 53:53/udp \
 export RUST_LOG=info
 export INTERCEPTOR_BIND_ADDR=0.0.0.0
 export INTERCEPTOR_UDP_PORT=53
-export DNS_API_URL=http://localhost:8081
+export DNS_API_URL=http://localhost:8080
 
 ./target/release/dns-interceptor
 ```
@@ -92,7 +92,7 @@ export DNS_API_URL=http://localhost:8081
 |----------------------|------------------|---------------------------------------------------------------------|
 | `INTERCEPTOR_BIND_ADDR` | `0.0.0.0`        | Dirección donde escucha el socket UDP.                              |
 | `INTERCEPTOR_UDP_PORT`  | `53`             | Puerto UDP (estándar: 53, para dev: 5353).            |
-| `DNS_API_URL`           | `http://localhost:8081` | URL base del DNS API.                  |
+| `DNS_API_URL`           | `http://localhost:8080` | URL base del DNS API.                  |
 | `DNS_API_TIMEOUT_MS`    | `5000`           | Timeout (ms) de solicitudes HTTP al DNS API.                        |
 | `RUST_LOG`              | (ninguno)        | Nivel de logging: `trace`, `debug`, `info`, `warn`, `error`.        |
 | `MOCK_API_PORT`         | `8081`           | Puerto donde escucha el mock_dns_api.|
@@ -101,15 +101,14 @@ export DNS_API_URL=http://localhost:8081
 
 ## Integración con el DNS API Real
 
-Una vez que el DNS API real esté disponible:
+La integración completa se levanta desde la raíz del repositorio:
 
-1. Obtén la URL del DNS API (ej. `http://dns-api:8080`).
-2. Actualizar `docker-compose.yml`, sección `dns-interceptor` → `environment` → `DNS_API_URL`:
-   ```yaml
-   DNS_API_URL: "http://dns-api:8080"
-   ```
-3. Opcionalmente, remover o comentar el servicio `mock-dns-api` si no es necesario.
-4. Levantar nuevamente: `docker-compose up -d`.
+```bash
+docker compose up -d dns-api dns-interceptor
+```
+
+El servicio `dns-interceptor` recibe `DNS_API_URL=http://dns-api:8080` por configuración y espera
+el healthcheck de `dns-api` antes de arrancar.
 
 ---
 
