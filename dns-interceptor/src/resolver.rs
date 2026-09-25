@@ -19,6 +19,7 @@ impl MotorResolucion {
     pub fn seleccionar_ip_destino(
         registro: &RegistroDns,
         ip_cliente_str: &str,
+        pais_cliente: Option<&str>,
     ) -> Option<(Ipv4Addr, u32)> {
         // saca solo las IPs que estan sanas
         let destinos_sanos: Vec<&DestinoDns> = registro
@@ -47,8 +48,8 @@ impl MotorResolucion {
             // eleccion al azar segun el peso asignado
             "weight" => Self::seleccionar_por_peso(&destinos_sanos),
 
-            // eleccion por ubicacion geografica o al azar
-            "geo" => Self::seleccionar_por_geo(&destinos_sanos, ip_cliente_str),
+            // eleccion por ubicacion geografica del cliente o al azar si no coincide
+            "geo" => Self::seleccionar_por_geo(&destinos_sanos, pais_cliente),
 
             // escoge la IP con menor tiempo de respuesta RTT
             "round-trip" => Self::seleccionar_por_latencia(&destinos_sanos),
@@ -94,14 +95,28 @@ impl MotorResolucion {
         destinos.first().copied()
     }
 
-    // seleccion por pais
-    fn seleccionar_por_geo<'a>(destinos: &[&'a DestinoDns], _ip_cliente: &str) -> Option<&'a DestinoDns> {
+    // seleccion por pais del cliente
+    fn seleccionar_por_geo<'a>(
+        destinos: &[&'a DestinoDns],
+        pais_cliente: Option<&str>,
+    ) -> Option<&'a DestinoDns> {
+        if let Some(pais) = pais_cliente {
+            let pais_upper = pais.to_uppercase();
+            if let Some(coincidencia) = destinos.iter().find(|d| {
+                d.pais.as_deref().map(|p| p.to_uppercase()) == Some(pais_upper.clone())
+            }) {
+                info!("Estrategia geo encontró coincidencia directa para país {}", pais_upper);
+                return Some(coincidencia);
+            }
+        }
+
+        // si no coincide o no hay pais conocido se escoge uno al azar
         let mut rng = rand::thread_rng();
         let idx = rng.gen_range(0..destinos.len());
         destinos.get(idx).copied()
     }
 
-    // seleccion por la latencia mas baja
+    // seleccion por la latencia mas baja RTT
     fn seleccionar_por_latencia<'a>(destinos: &[&'a DestinoDns]) -> Option<&'a DestinoDns> {
         destinos
             .iter()
@@ -130,6 +145,17 @@ mod tests {
         }
     }
 
+    fn crear_destino_con_pais(ip: &str, pais: &str, estado: &str) -> DestinoDns {
+        DestinoDns {
+            id: None,
+            ip: ip.to_string(),
+            peso: Some(1),
+            pais: Some(pais.to_string()),
+            estado: Some(estado.to_string()),
+            latencia_promedio_ms: Some(10.0),
+        }
+    }
+
     #[test]
     fn test_estrategia_single() {
         let registro = RegistroDns {
@@ -141,7 +167,7 @@ mod tests {
             destinos: vec![crear_destino("10.0.0.1", 1, "healthy", 10.0)],
         };
 
-        let res = MotorResolucion::seleccionar_ip_destino(&registro, "127.0.0.1").unwrap();
+        let res = MotorResolucion::seleccionar_ip_destino(&registro, "127.0.0.1", None).unwrap();
         assert_eq!(res.0, Ipv4Addr::new(10, 0, 0, 1));
     }
 
@@ -159,10 +185,28 @@ mod tests {
             ],
         };
 
-        let res1 = MotorResolucion::seleccionar_ip_destino(&registro, "127.0.0.1").unwrap();
-        let res2 = MotorResolucion::seleccionar_ip_destino(&registro, "127.0.0.1").unwrap();
+        let res1 = MotorResolucion::seleccionar_ip_destino(&registro, "127.0.0.1", None).unwrap();
+        let res2 = MotorResolucion::seleccionar_ip_destino(&registro, "127.0.0.1", None).unwrap();
 
         assert_ne!(res1.0, res2.0);
+    }
+
+    #[test]
+    fn test_estrategia_geo_coincidencia_pais() {
+        let registro = RegistroDns {
+            id: None,
+            dominio: "geo.com".to_string(),
+            tipo: "geo".to_string(),
+            ttl: 300,
+            esta_activo: true,
+            destinos: vec![
+                crear_destino_con_pais("10.0.0.1", "US", "healthy"),
+                crear_destino_con_pais("10.0.0.2", "CR", "healthy"),
+            ],
+        };
+
+        let res = MotorResolucion::seleccionar_ip_destino(&registro, "190.10.1.1", Some("CR")).unwrap();
+        assert_eq!(res.0, Ipv4Addr::new(10, 0, 0, 2));
     }
 
     #[test]
@@ -179,7 +223,7 @@ mod tests {
             ],
         };
 
-        let res = MotorResolucion::seleccionar_ip_destino(&registro, "127.0.0.1").unwrap();
+        let res = MotorResolucion::seleccionar_ip_destino(&registro, "127.0.0.1", None).unwrap();
         assert_eq!(res.0, Ipv4Addr::new(10, 0, 0, 2));
     }
 
@@ -194,6 +238,6 @@ mod tests {
             destinos: vec![crear_destino("10.0.0.1", 1, "unhealthy", 10.0)],
         };
 
-        assert!(MotorResolucion::seleccionar_ip_destino(&registro, "127.0.0.1").is_none());
+        assert!(MotorResolucion::seleccionar_ip_destino(&registro, "127.0.0.1", None).is_none());
     }
 }

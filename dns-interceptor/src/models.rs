@@ -7,10 +7,12 @@ use serde::{Deserialize, Serialize};
 #[serde(rename_all = "camelCase")]
 pub struct RespuestaExiste {
     // verdadero si el dominio esta en la base de datos
+    #[serde(alias = "exists")]
     pub existe: bool,
     // nombre de host consultado
     pub hostname: String,
     // tipo de registro como single multi weight geo roundtrip o None si no existe
+    #[serde(alias = "type")]
     pub tipo: Option<String>,
 }
 
@@ -23,12 +25,16 @@ pub struct DestinoDns {
     // direccion IP v4 de la maquina
     pub ip: String,
     // peso para el balanceo probabilistico
+    #[serde(alias = "weight")]
     pub peso: Option<u32>,
     // codigo del pais de dos letras para el ruteo por zona
+    #[serde(alias = "country")]
     pub pais: Option<String>,
     // estado reportado por el monitor de salud
+    #[serde(alias = "status")]
     pub estado: Option<String>,
     // latencia en milisegundos para la estrategia roundtrip
+    #[serde(alias = "avgLatencyMs", alias = "latency", alias = "rtt")]
     pub latencia_promedio_ms: Option<f64>,
 }
 
@@ -50,14 +56,18 @@ pub struct RegistroDns {
     // id del registro
     pub id: Option<String>,
     // nombre del dominio
+    #[serde(alias = "domain", alias = "hostname")]
     pub dominio: String,
     // estrategia de resolucion configurada
+    #[serde(alias = "type")]
     pub tipo: String,
     // tiempo de vida TTL en segundos
     pub ttl: u32,
     // indica si el registro esta activo
+    #[serde(alias = "isActive", alias = "active")]
     pub esta_activo: bool,
     // lista de destinos o IPs asociadas
+    #[serde(alias = "targets")]
     pub destinos: Vec<DestinoDns>,
 }
 
@@ -74,7 +84,9 @@ pub struct PaqueteDnsBase64 {
 #[serde(rename_all = "camelCase")]
 pub struct RespuestaPaisIp {
     // codigo del pais
+    #[serde(alias = "countryCode", alias = "country")]
     pub codigo_pais: Option<String>,
     // nombre del pais
+    #[serde(alias = "countryName", alias = "name")]
     pub nombre_pais: Option<String>,
 }

@@ -87,7 +87,18 @@ async fn procesar_paquete(
         Ok(res_existe) if res_existe.existe => {
             // si existe trae las IPs y busca la mejor con la estrategia
             if let Ok(Some(registro)) = cliente_api.obtener_registro(&pregunta.nombre_host).await {
-                if let Some((ip_destino, ttl)) = MotorResolucion::seleccionar_ip_destino(&registro, &ip_cliente_str) {
+                // si la estrategia es geo consulta el pais de la IP del cliente
+                let pais_cliente = if registro.tipo == "geo" {
+                    cliente_api.consultar_pais_ip(&ip_cliente_str).await
+                } else {
+                    None
+                };
+
+                if let Some((ip_destino, ttl)) = MotorResolucion::seleccionar_ip_destino(
+                    &registro,
+                    &ip_cliente_str,
+                    pais_cliente.as_deref(),
+                ) {
                     if let Ok(bytes_respuesta) = construir_respuesta_dns(&paquete, ip_destino, ttl) {
                         // devuelve la respuesta al cliente UDP
                         let _ = socket.send_to(&bytes_respuesta, direccion_cliente).await;
