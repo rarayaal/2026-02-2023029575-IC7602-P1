@@ -37,7 +37,7 @@ services:
     container_name: dns-api
     ports:
       - "8080:8080"
-    # Las credenciales de Supabase viven en dns-api/.env, que no se versiona.
+    # Las credenciales de Supabase se leen de dns-api/.env, que no se versiona.
     # Copiar dns-api/.env.example como dns-api/.env y completarlo antes de levantar el stack.
     env_file:
       - path: ./dns-api/.env
@@ -46,14 +46,10 @@ services:
       DNS_API_HOST: "0.0.0.0"
       DNS_API_PORT: "8080"
       DNS_API_MAX_THREADS: "100"
-      SUPABASE_URL: "${SUPABASE_URL:?Define SUPABASE_URL before starting the DNS API}"
-      SUPABASE_SERVICE_ROLE_KEY: "${SUPABASE_SERVICE_ROLE_KEY:?Define SUPABASE_SERVICE_ROLE_KEY before starting the DNS API}"
       # Servidor DNS remoto al que se delegan los paquetes no estandar.
       DNS_SERVER_IP: "8.8.8.8"
       DNS_SERVER_PORT: "53"
       DNS_TIMEOUT_MS: "3000"
-    depends_on:
-      - supabase-rest
     healthcheck:
       # wget viene incluido en la imagen base alpine, no hay que instalar nada.
       test: ["CMD-SHELL", "wget -q -O- http://localhost:8080/api/health || exit 1"]
