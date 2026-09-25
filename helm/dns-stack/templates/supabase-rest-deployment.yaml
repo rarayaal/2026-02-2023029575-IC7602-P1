@@ -1,0 +1,43 @@
+{{- if .Values.supabaseRest.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "dns-stack.fullname" . }}-supabase-rest
+  labels:
+    app: supabase-rest
+    {{- include "dns-stack.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: supabase-rest
+  template:
+    metadata:
+      labels:
+        app: supabase-rest
+    spec:
+      containers:
+        - name: supabase-rest
+          image: "{{ .Values.supabaseRest.image.repository }}:{{ .Values.supabaseRest.image.tag }}"
+          imagePullPolicy: {{ .Values.supabaseRest.image.pullPolicy }}
+          ports:
+            - containerPort: 80
+              name: http
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: supabase-rest
+  labels:
+    app: supabase-rest
+    {{- include "dns-stack.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.supabaseRest.service.type }}
+  ports:
+    - port: {{ .Values.supabaseRest.service.port }}
+      targetPort: 80
+      protocol: TCP
+      name: http
+  selector:
+    app: supabase-rest
+{{- end }}

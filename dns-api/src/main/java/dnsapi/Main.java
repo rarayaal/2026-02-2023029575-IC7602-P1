@@ -2,9 +2,16 @@ package dnsapi;
 
 import dnsapi.config.ApiConfig;
 import dnsapi.config.ConfigurationException;
+import dnsapi.dns.UdpDnsClient;
+import dnsapi.healthchecks.HealthCheckRepository;
+import dnsapi.healthchecks.SupabaseHealthCheckRepository;
+import dnsapi.ipcountry.IpCountryRepository;
+import dnsapi.ipcountry.SupabaseIpCountryRepository;
 import dnsapi.http.ApiServer;
 import dnsapi.records.DnsRecordRepository;
-import dnsapi.records.InMemoryDnsRecordRepository;
+import dnsapi.records.SupabaseDnsRecordRepository;
+import dnsapi.supabase.SupabaseClient;
+import dnsapi.supabase.SupabaseException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -20,18 +27,29 @@ public final class Main {
         try {
             ApiConfig config = ApiConfig.fromEnvironment(System::getenv);
 
-            // Temporal: mientras el esquema de datos (T-25) no exista, los registros viven en
-            // memoria. Al cambiar esta linea por la implementacion de Supabase, los endpoints
-            // siguen funcionando sin modificarse.
-            DnsRecordRepository records = InMemoryDnsRecordRepository.withSampleData();
-            log.warn("Usando el repositorio en memoria con datos de ejemplo, no hay base de datos");
+            SupabaseClient supabase = new SupabaseClient(config.supabaseUrl(), config.supabaseKey());
+            // Se prueba la conexion antes de abrir el puerto: sin base de datos el API no sirve, y
+            // es mejor fallar al arrancar con un mensaje claro que en la primera peticion.
+            supabase.get("dns_records", "select=id&limit=1");
+            log.info("Conexion con Supabase verificada");
 
-            ApiServer server = new ApiServer(config, records);
+            DnsRecordRepository records = new SupabaseDnsRecordRepository(supabase);
+            IpCountryRepository ranges = new SupabaseIpCountryRepository(supabase);
+            HealthCheckRepository checks = new SupabaseHealthCheckRepository(supabase);
+
+            UdpDnsClient dnsClient = new UdpDnsClient(
+                    config.dnsServerIp(), config.dnsServerPort(), config.dnsTimeoutMillis());
+            log.info("Las consultas delegadas se resolveran contra {}", dnsClient.target());
+
+            ApiServer server = new ApiServer(config, records, ranges, checks, dnsClient);
             // Para que Docker pueda detener el contenedor sin matar peticiones a medio atender.
             Runtime.getRuntime().addShutdownHook(new Thread(server::stop, "dns-api-shutdown"));
             server.start();
         } catch (ConfigurationException e) {
             log.error("Configuracion invalida, el API no puede arrancar: {}", e.getMessage());
+            System.exit(1);
+        } catch (SupabaseException e) {
+            log.error("No hay conexion con Supabase, el API no puede arrancar: {}", e.getMessage());
             System.exit(1);
         }
     }

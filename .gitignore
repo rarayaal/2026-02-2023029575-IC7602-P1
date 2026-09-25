@@ -12,3 +12,7 @@ node_modules/
 dist/
 *.local
 .DS_Store
+
+# C build artifacts
+*.o
+health_checker_bin

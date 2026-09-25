@@ -1,0 +1,53 @@
+version: '3.8'
+
+services:
+  checker-cr:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: health-checker-cr
+    environment:
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - INSTANCE_ID=hc-cr-sjo
+      - INSTANCE_COUNTRY=CR
+      - INSTANCE_CITY=San Jose
+      - INSTANCE_LAT=9.928100
+      - INSTANCE_LON=-84.090700
+      - SIMULATED_RTT_PENALTY_MS=0.0
+      - SYNC_INTERVAL_SECONDS=30
+    restart: unless-stopped
+
+  checker-us:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: health-checker-us
+    environment:
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - INSTANCE_ID=hc-us-nyc
+      - INSTANCE_COUNTRY=US
+      - INSTANCE_CITY=New York
+      - INSTANCE_LAT=40.712800
+      - INSTANCE_LON=-74.006000
+      - SIMULATED_RTT_PENALTY_MS=45.0
+      - SYNC_INTERVAL_SECONDS=30
+    restart: unless-stopped
+
+  checker-eu:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: health-checker-eu
+    environment:
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - INSTANCE_ID=hc-eu-fra
+      - INSTANCE_COUNTRY=DE
+      - INSTANCE_CITY=Frankfurt
+      - INSTANCE_LAT=50.110900
+      - INSTANCE_LON=8.682100
+      - SIMULATED_RTT_PENALTY_MS=120.0
+      - SYNC_INTERVAL_SECONDS=30
+    restart: unless-stopped

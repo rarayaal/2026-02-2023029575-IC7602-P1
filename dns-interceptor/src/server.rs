@@ -1,13 +1,13 @@
 // servidor UDP asincrono que recibe y procesa las peticiones DNS
 
-use std::net::{Ipv4Addr, SocketAddr};
+use std::net::{IpAddr, SocketAddr};
 use std::sync::Arc;
 use tokio::net::UdpSocket;
-use tracing::{error, info, warn};
+use tracing::{info, warn};
 
 use crate::api_client::ClienteApiDns;
 use crate::config::Configuracion;
-use crate::dns::{construir_respuesta_dns, EncabezadoDns, PreguntaDns};
+use crate::dns::{build_response, DnsMessage, PacketKind, ResolvedRecord};
 use crate::resolver::MotorResolucion;
 
 // tamano maximo del paquete DNS en UDP de 512 bytes
@@ -53,82 +53,87 @@ async fn procesar_paquete(
     socket: Arc<UdpSocket>,
     cliente_api: Arc<ClienteApiDns>,
 ) {
-    // lee el encabezado de 12 bytes
-    let encabezado = match EncabezadoDns::parsear(&paquete) {
-        Ok(h) => h,
+    match DnsMessage::parse(paquete.clone()) {
+        Ok(mensaje) => {
+            let tipo_paquete = mensaje.classify();
+            let ip_cliente_str = direccion_cliente.ip().to_string();
+
+            match tipo_paquete {
+                PacketKind::StandardQuery => match mensaje.question() {
+                    Ok(pregunta) => {
+                        info!(
+                            "Paquete de {direccion_cliente}: id={:#06x} qname={} qtype={} qclass={} -> StandardQuery",
+                            mensaje.header.id,
+                            pregunta.qname,
+                            pregunta.qtype,
+                            pregunta.qclass
+                        );
+
+                        // Intenta resolver via API REST (verificar existencia + obtener registro)
+
+                        match cliente_api.verificar_existencia(&pregunta.qname).await {
+                            Ok(res_existe) if res_existe.existe => {
+                                // Si el dominio existe localmente, busca el mejor registro segun estrategia
+                                match cliente_api.obtener_registro(&pregunta.qname).await {
+                                    Ok(Some(registro)) => {
+                                        if let Some((ip_destino, ttl)) = MotorResolucion::seleccionar_ip_destino(&registro, &ip_cliente_str) {
+                                            let registros = [ResolvedRecord {
+                                                ip: IpAddr::V4(ip_destino),
+                                                ttl,
+                                            }];
+                                            let respuesta = build_response(&mensaje, &pregunta, &registros);
+                                            if let Err(e) = socket.send_to(&respuesta, direccion_cliente).await {
+                                                warn!("Error enviando respuesta a {direccion_cliente}: {e}");
+                                            }
+                                            info!("Respuesta DNS enviada a {direccion_cliente} -> IP: {ip_destino} (estrategia: {})", registro.tipo);
+                                            return;
+                                        }
+                                    }
+                                    Ok(None) => {
+                                        warn!("Dominio '{}' existe pero sin registros activos para {direccion_cliente}", pregunta.qname);
+                                    }
+                                    Err(e) => {
+                                        warn!("Error obteniendo registro para '{}': {e}", pregunta.qname);
+                                    }
+                                }
+                            }
+                            Ok(_) => {
+                                info!("Dominio '{}' no registrado localmente -> Reenviando a DNS API", pregunta.qname);
+                            }
+                            Err(e) => {
+                                warn!("Error verificando existencia de '{}': {e} -> reenviando a DNS API", pregunta.qname);
+                            }
+                        }
+
+                        // Fallback: si no se resolvio localmente, delega a la API resolutora
+                        delegar_paquete_no_estandar(paquete, direccion_cliente, socket, cliente_api).await;
+                    }
+                    Err(e) => {
+                        warn!("Paquete de {direccion_cliente} clasificado como StandardQuery pero con Question inválida: {e:?}");
+                        // Aun asi intenta delegarlo
+                        delegar_paquete_no_estandar(paquete, direccion_cliente, socket, cliente_api).await;
+                    }
+                },
+                PacketKind::NonStandard => {
+                    info!(
+                        "Paquete de {direccion_cliente}: id={:#06x} opcode={} -> NonStandard, delegando al DNS API",
+                        mensaje.header.id,
+                        mensaje.header.opcode
+                    );
+
+                    delegar_paquete_no_estandar(paquete, direccion_cliente, socket, cliente_api).await;
+                }
+            }
+        }
         Err(e) => {
             warn!("Paquete UDP descartado desde {direccion_cliente}: {e:?}");
             return;
         }
     };
-
-    // si no es una consulta estandar se manda a la API en BASE64
-    if !encabezado.es_consulta_estandar() {
-        info!("Paquete No Estándar recibido de {direccion_cliente} -> Delegando a DNS API");
-        delegar_no_estandar(paquete, direccion_cliente, socket, cliente_api).await;
-        return;
-    }
-
-    // lee la seccion de pregunta para sacar el nombre del dominio
-    let pregunta = match PreguntaDns::parsear(&paquete) {
-        Ok(q) => q,
-        Err(e) => {
-            warn!("Sección Question inválida desde {direccion_cliente}: {e:?}");
-            delegar_no_estandar(paquete, direccion_cliente, socket, cliente_api).await;
-            return;
-        }
-    };
-
-    let ip_cliente_str = direccion_cliente.ip().to_string();
-    info!("Consulta estándar de {direccion_cliente} para host: '{}'", pregunta.nombre_host);
-
-    // revisa con la API REST si el dominio existe
-    match cliente_api.verificar_existencia(&pregunta.nombre_host).await {
-        Ok(res_existe) if res_existe.existe => {
-            // si existe trae las IPs y busca la mejor con la estrategia
-            if let Ok(Some(registro)) = cliente_api.obtener_registro(&pregunta.nombre_host).await {
-                // si la estrategia es geo consulta el pais de la IP del cliente
-                let pais_cliente = if registro.tipo == "geo" {
-                    cliente_api.consultar_pais_ip(&ip_cliente_str).await
-                } else {
-                    None
-                };
-
-                if let Some((ip_destino, ttl)) = MotorResolucion::seleccionar_ip_destino(
-                    &registro,
-                    &ip_cliente_str,
-                    pais_cliente.as_deref(),
-                ) {
-                    if let Ok(bytes_respuesta) = construir_respuesta_dns(&paquete, ip_destino, ttl) {
-                        // devuelve la respuesta al cliente UDP
-                        let _ = socket.send_to(&bytes_respuesta, direccion_cliente).await;
-                        info!("Respuesta DNS enviada a {direccion_cliente} -> IP: {ip_destino}");
-                        return;
-                    }
-                }
-            }
-            warn!("No se pudo seleccionar una IP sana para '{}' -> aplicando fallback", pregunta.nombre_host);
-            delegar_no_estandar(paquete, direccion_cliente, socket, cliente_api).await;
-        }
-        Ok(_) => {
-            // si no esta registrado lo delega a la API resolutora
-            info!("Dominio '{}' no registrado localmente -> Reenviando a DNS API", pregunta.nombre_host);
-            delegar_no_estandar(paquete, direccion_cliente, socket, cliente_api).await;
-        }
-        Err(e) => {
-            // si la API esta caida responde 127.0.0.1 para probar localmente sin caidas
-            warn!("DNS API fuera de línea ({e}). Modo pruebas locales: respondiendo 127.0.0.1 para '{}'", pregunta.nombre_host);
-            let ip_prueba = Ipv4Addr::new(127, 0, 0, 1);
-            if let Ok(bytes_respuesta) = construir_respuesta_dns(&paquete, ip_prueba, 300) {
-                let _ = socket.send_to(&bytes_respuesta, direccion_cliente).await;
-                info!("Respuesta DNS de prueba enviada a {direccion_cliente} -> IP: {ip_prueba}");
-            }
-        }
-    }
 }
 
-// reenvia las peticiones no estandares o no registradas en BASE64 a la DNS API
-async fn delegar_no_estandar(
+// reenvia un paquete en BASE64 a la DNS API via resolver_remoto_base64
+async fn delegar_paquete_no_estandar(
     paquete: Vec<u8>,
     direccion_cliente: SocketAddr,
     socket: Arc<UdpSocket>,
@@ -136,17 +141,14 @@ async fn delegar_no_estandar(
 ) {
     match cliente_api.resolver_remoto_base64(&paquete).await {
         Ok(bytes_respuesta) => {
-            let _ = socket.send_to(&bytes_respuesta, direccion_cliente).await;
-            info!("Respuesta remota decodificada y enviada a {direccion_cliente}");
+            if let Err(e) = socket.send_to(&bytes_respuesta, direccion_cliente).await {
+                warn!("Error reenviando respuesta del DNS API a {direccion_cliente}: {e}");
+            }
+            info!("Respuesta del DNS API decodificada y reenviada a {direccion_cliente}");
         }
         Err(e) => {
-            error!("Fallo en la delegación remota para {direccion_cliente}: {e}");
-            // si falla la delegacion responde la IP local por respaldo
-            let ip_prueba = Ipv4Addr::new(127, 0, 0, 1);
-            if let Ok(bytes_respuesta) = construir_respuesta_dns(&paquete, ip_prueba, 300) {
-                let _ = socket.send_to(&bytes_respuesta, direccion_cliente).await;
-                info!("Respuesta DNS de contingencia enviada a {direccion_cliente} -> IP: {ip_prueba}");
-            }
+            warn!("Error delegando paquete de {direccion_cliente} al DNS API: {e}");
         }
     }
 }
+

@@ -1,57 +1,83 @@
-// modulo para parsear el encabezado de un paquete DNS
-pub const TAMANO_ENCABEZADO: usize = 12;
+/// Tamaño fijo del header DNS: 12 bytes (segun RFC1035 §4.1.1).
+pub const HEADER_SIZE: usize = 12;
 
-// errores de lectura al procesar los bytes
+/// Errores posibles al parsear un mensaje DNS. Se amplía en fases futuras (Question, Answer, etc.).
 #[derive(Debug, PartialEq, Eq)]
-pub enum ErrorParseoDns {
-    DemasiadoCorto,
-    PreguntaInvalida,
+pub enum DnsParseError {
+    /// El paquete no alcanza los 12 bytes mínimos del header.
+    TooShort,
+    /// La sección Question tiene formato inválido.
+    InvalidQuestion,
+    /// Se encontró un puntero de nombre en la sección Question (no soportado en consultas entrantes).
+    UnsupportedNamePointer,
 }
 
-// estructura con los 12 bytes del encabezado DNS
+impl DnsParseError {
+    pub const DemasiadoCorto: Self = Self::TooShort;
+    pub const PreguntaInvalida: Self = Self::InvalidQuestion;
+    pub const PunteroNombreNoSoportado: Self = Self::UnsupportedNamePointer;
+}
+
+
+/// Header de 12 bytes de un mensaje DNS (RFC1035 §4.1.1 / RFC2929).
+///
+/// Layout de los dos bytes de flags (bytes 2 y 3, después del ID):
+/// ```text
+/// byte 2: QR(1) OPCODE(4) AA(1) TC(1) RD(1)
+/// byte 3: RA(1) Z(3)      RCODE(4)
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct EncabezadoDns {
-    pub id: u16, // identificador de transaccion
-    pub qr: bool, // cero consulta uno respuesta
-    pub opcode: u8, // cero consulta estandar
-    pub aa: bool, // uno respuesta autorizada
-    pub tc: bool, // uno paquete truncado
-    pub rd: bool, // uno si pide resolucion recursiva
-    pub ra: bool, // uno si el servidor soporta recursion
-    pub z: u8, // tres bits reservados
-    pub rcode: u8, // codigo de respuesta
-    pub qdcount: u16, // cantidad de preguntas
-    pub ancount: u16, // cantidad de respuestas
-    pub nscount: u16, // cantidad de registros de autoridad
-    pub arcount: u16, // cantidad de registros adicionales
+pub struct DnsHeader {
+    pub id: u16,
+    /// Query (false) o Response (true).
+    pub qr: bool,
+    /// Tipo de operación: 0 = QUERY estándar, 1 = IQUERY, 2 = STATUS, etc.
+    pub opcode: u8,
+    /// Authoritative Answer.
+    pub aa: bool,
+    /// Truncation: el mensaje fue truncado por exceder el tamaño permitido.
+    pub tc: bool,
+    /// Recursion Desired (seteado por el cliente).
+    pub rd: bool,
+    /// Recursion Available (seteado por el servidor en la respuesta).
+    pub ra: bool,
+    /// Reservado para uso futuro, debe ser 0 según RFC1035 (RFC2929 lo reutiliza en extensiones).
+    pub z: u8,
+    /// Response code (0 = sin error, etc.).
+    pub rcode: u8,
+    pub qdcount: u16,
+    pub ancount: u16,
+    pub nscount: u16,
+    pub arcount: u16,
 }
 
-impl EncabezadoDns {
-    // interpreta los primeros 12 bytes de la trama
-    pub fn parsear(bytes: &[u8]) -> Result<Self, ErrorParseoDns> {
-        if bytes.len() < TAMANO_ENCABEZADO { // revisa que tenga al menos 12 bytes
-            return Err(ErrorParseoDns::DemasiadoCorto);
+impl DnsHeader {
+    /// Parsea los primeros 12 bytes de un mensaje DNS crudo.
+    pub fn parse(bytes: &[u8]) -> Result<Self, DnsParseError> {
+        if bytes.len() < HEADER_SIZE {
+            return Err(DnsParseError::TooShort);
         }
 
-        let id = u16::from_be_bytes([bytes[0], bytes[1]]); // ID de transaccion
-        let flags_alto = bytes[2]; // flags de control parte alta
-        let flags_bajo = bytes[3]; // flags de control parte baja
+        let id = u16::from_be_bytes([bytes[0], bytes[1]]);
 
-        // extrae bit por bit
-        let qr = (flags_alto & 0b1000_0000) != 0; // QR bit 7
-        let opcode = (flags_alto >> 3) & 0b0000_1111; // OPCODE bits 3 a 6
-        let aa = (flags_alto & 0b0000_0100) != 0; // AA bit 2
-        let tc = (flags_alto & 0b0000_0010) != 0; // TC bit 1
-        let rd = (flags_alto & 0b0000_0001) != 0; // RD bit 0
-        let ra = (flags_bajo & 0b1000_0000) != 0; // RA bit 7
-        let z = (flags_bajo >> 4) & 0b0000_0111; // Z bits 4 a 6
-        let rcode = flags_bajo & 0b0000_1111; // RCODE bits 0 a 3
+        // Los flags vienen empaquetados en bits, no en bytes completos, así que se extraen con máscaras.
+        let flags_hi = bytes[2];
+        let flags_lo = bytes[3];
 
-        // contadores de las secciones del paquete
-        let qdcount = u16::from_be_bytes([bytes[4], bytes[5]]); // QDCOUNT preguntas
-        let ancount = u16::from_be_bytes([bytes[6], bytes[7]]); // ANCOUNT respuestas
-        let nscount = u16::from_be_bytes([bytes[8], bytes[9]]); // NSCOUNT autoridad
-        let arcount = u16::from_be_bytes([bytes[10], bytes[11]]); // ARCOUNT adicionales
+        let qr = (flags_hi & 0b1000_0000) != 0;
+        let opcode = (flags_hi >> 3) & 0b0000_1111;
+        let aa = (flags_hi & 0b0000_0100) != 0;
+        let tc = (flags_hi & 0b0000_0010) != 0;
+        let rd = (flags_hi & 0b0000_0001) != 0;
+
+        let ra = (flags_lo & 0b1000_0000) != 0;
+        let z = (flags_lo >> 4) & 0b0000_0111;
+        let rcode = flags_lo & 0b0000_1111;
+
+        let qdcount = u16::from_be_bytes([bytes[4], bytes[5]]);
+        let ancount = u16::from_be_bytes([bytes[6], bytes[7]]);
+        let nscount = u16::from_be_bytes([bytes[8], bytes[9]]);
+        let arcount = u16::from_be_bytes([bytes[10], bytes[11]]);
 
         Ok(Self {
             id,
@@ -70,8 +96,14 @@ impl EncabezadoDns {
         })
     }
 
-    // verifica si es una consulta DNS estandar
-    pub fn es_consulta_estandar(&self) -> bool {
+    /// Alias compatible de parse() para interoperabilidad.
+    pub fn parsear(bytes: &[u8]) -> Result<Self, DnsParseError> {
+        Self::parse(bytes)
+    }
+
+
+    /// Criterio de clasificación del proyecto: query estándar = QR=0 y OPCODE=0 (ver enunciado P1).
+    pub fn is_standard_query(&self) -> bool {
         !self.qr && self.opcode == 0
     }
 }
@@ -80,22 +112,54 @@ impl EncabezadoDns {
 mod tests {
     use super::*;
 
-    #[test]
-    fn parsea_encabezado_query_estandar() {
-        // paquete de prueba de 12 bytes
-        let bytes: [u8; 12] = [
-            0x12, 0x34, // ID 0x1234
-            0x01, 0x00, // RD 1 QR 0 OPCODE 0
-            0x00, 0x01, // QDCOUNT 1
-            0x00, 0x00, // ANCOUNT 0
-            0x00, 0x00, // NSCOUNT 0
-            0x00, 0x00, // ARCOUNT 0
-        ];
+    /// ID=0x1234, QR=0, OPCODE=0, RD=1, QDCOUNT=1, resto en 0 (query estándar típico de un cliente).
+    const STANDARD_QUERY: [u8; HEADER_SIZE] = [
+        0x12, 0x34, // ID
+        0x01, 0x00, // flags: RD=1, resto 0
+        0x00, 0x01, // QDCOUNT=1
+        0x00, 0x00, // ANCOUNT=0
+        0x00, 0x00, // NSCOUNT=0
+        0x00, 0x00, // ARCOUNT=0
+    ];
 
-        let header = EncabezadoDns::parsear(&bytes).unwrap();
+    /// Mismo ID, pero OPCODE=1 (IQUERY) -> no es un query estándar según el criterio del proyecto.
+    const NON_STANDARD_OPCODE: [u8; HEADER_SIZE] = [
+        0x12, 0x34, 0x08, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    ];
+
+    /// QR=1 (respuesta) -> tampoco es un query estándar entrante.
+    const NON_STANDARD_QR: [u8; HEADER_SIZE] = [
+        0x12, 0x34, 0x80, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    ];
+
+    #[test]
+    fn parsea_header_de_query_estandar() {
+        let header = DnsHeader::parse(&STANDARD_QUERY).unwrap();
         assert_eq!(header.id, 0x1234);
         assert!(!header.qr);
         assert_eq!(header.opcode, 0);
-        assert!(header.es_consulta_estandar());
+        assert!(header.rd);
+        assert_eq!(header.qdcount, 1);
+        assert!(header.is_standard_query());
+    }
+
+    #[test]
+    fn clasifica_opcode_distinto_de_cero_como_no_estandar() {
+        let header = DnsHeader::parse(&NON_STANDARD_OPCODE).unwrap();
+        assert_eq!(header.opcode, 1);
+        assert!(!header.is_standard_query());
+    }
+
+    #[test]
+    fn clasifica_respuesta_como_no_estandar() {
+        let header = DnsHeader::parse(&NON_STANDARD_QR).unwrap();
+        assert!(header.qr);
+        assert!(!header.is_standard_query());
+    }
+
+    #[test]
+    fn rechaza_paquetes_mas_cortos_que_el_header() {
+        let bytes = [0u8; 5];
+        assert_eq!(DnsHeader::parse(&bytes), Err(DnsParseError::TooShort));
     }
 }

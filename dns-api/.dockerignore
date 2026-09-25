@@ -1,0 +1,10 @@
+# El .env lleva credenciales y nunca debe entrar a la imagen.
+.env
+
+# Resultado de compilar en la maquina: la imagen compila lo suyo desde cero.
+target/
+
+# Archivos de editores y del sistema.
+.idea/
+*.iml
+.vscode/

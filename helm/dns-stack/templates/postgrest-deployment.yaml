@@ -1,0 +1,52 @@
+{{- if .Values.postgrest.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "dns-stack.fullname" . }}-postgrest
+  labels:
+    app: postgrest
+    {{- include "dns-stack.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgrest
+  template:
+    metadata:
+      labels:
+        app: postgrest
+    spec:
+      containers:
+        - name: postgrest
+          image: "{{ .Values.postgrest.image.repository }}:{{ .Values.postgrest.image.tag }}"
+          imagePullPolicy: {{ .Values.postgrest.image.pullPolicy }}
+          ports:
+            - containerPort: 3000
+              name: http
+          env:
+            - name: PGRST_DB_URI
+              value: "postgres://{{ .Values.database.env.postgresUser }}:{{ .Values.database.env.postgresPassword }}@database:5432/{{ .Values.database.env.postgresDb }}"
+            - name: PGRST_DB_SCHEMA
+              value: "public"
+            - name: PGRST_DB_ANON_ROLE
+              value: "postgres"
+            - name: PGRST_JWT_SECRET
+              value: "super-secret-jwt-secret-with-at-least-32-characters-long"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgrest
+  labels:
+    app: postgrest
+    {{- include "dns-stack.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.postgrest.service.type }}
+  ports:
+    - port: {{ .Values.postgrest.service.port }}
+      targetPort: 3000
+      protocol: TCP
+      name: http
+  selector:
+    app: postgrest
+{{- end }}

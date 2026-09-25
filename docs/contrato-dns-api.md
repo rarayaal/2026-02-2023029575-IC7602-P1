@@ -340,6 +340,33 @@ nada.
 El Interceptor usa esta tabla para resolver los registros `geo`: toma la IP de origen del cliente y
 busca en qué rango cae.
 
+### `GET /api/ip-country/lookup` — país de una IP
+
+Para que el Interceptor no tenga que traerse la tabla completa, el API resuelve la búsqueda:
+
+```
+GET /api/ip-country/lookup?ip=190.113.4.20
+```
+
+```json
+{
+  "ip": "190.113.4.20",
+  "countryCode": "CR",
+  "countryName": "Costa Rica",
+  "city": "San José",
+  "latitude": 9.9281,
+  "longitude": -84.0907
+}
+```
+
+`city`, `latitude` y `longitude` aparecen solo si el rango los tiene cargados. Sirven para la
+estrategia `round-trip`: con ellos se estima dónde está el cliente y se compara con la ubicación de
+cada Health Checker.
+
+Si la IP no cae en ningún rango, responde `200` con `countryCode` y `countryName` en `null`, por la
+misma razón que `/api/exists`: no encontrarla es una respuesta válida. Si falta el parámetro `ip` o
+no es una IPv4 válida, responde `400`.
+
 ---
 
 ## 6. CRUD de health checks
