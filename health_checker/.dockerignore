@@ -1,0 +1,5 @@
+*.o
+health_checker_bin
+.DS_Store
+.git
+.gitignore

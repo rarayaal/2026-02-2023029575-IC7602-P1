@@ -76,7 +76,16 @@ async fn procesar_paquete(
                                 // Si el dominio existe localmente, busca el mejor registro segun estrategia
                                 match cliente_api.obtener_registro(&pregunta.qname).await {
                                     Ok(Some(registro)) => {
-                                        if let Some((ip_destino, ttl)) = MotorResolucion::seleccionar_ip_destino(&registro, &ip_cliente_str) {
+                                        // El pais del cliente lo resuelve el DNS API con la tabla
+                                        // IP-to-Country. Solo lo usa la estrategia geo; si no se
+                                        // puede determinar, geo escoge una IP al azar.
+                                        let pais_cliente = cliente_api.consultar_pais_ip(&ip_cliente_str).await;
+
+                                        if let Some((ip_destino, ttl)) = MotorResolucion::seleccionar_ip_destino(
+                                            &registro,
+                                            &ip_cliente_str,
+                                            pais_cliente.as_deref(),
+                                        ) {
                                             let registros = [ResolvedRecord {
                                                 ip: IpAddr::V4(ip_destino),
                                                 ttl,

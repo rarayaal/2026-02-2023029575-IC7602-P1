@@ -31,7 +31,10 @@ spec:
             - name: PGRST_DB_ANON_ROLE
               value: "postgres"
             - name: PGRST_JWT_SECRET
-              value: "super-secret-jwt-secret-with-at-least-32-characters-long"
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "dns-stack.fullname" . }}-secret
+                  key: SUPABASE_SERVICE_ROLE_KEY
 ---
 apiVersion: v1
 kind: Service
