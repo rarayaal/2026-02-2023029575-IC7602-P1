@@ -1,8 +1,12 @@
 # Valores por omisión para el Chart dns-stack (T-38 / T-39 - Rama Alexandra)
 
-# Componente 1: Base de Datos PostgreSQL
+# Componente auxiliar: PostgreSQL local.
+#
+# Apagado a proposito: ningun componente se conecta a esta base. Los datos viven en Supabase, con la
+# que hablan el DNS API y los Health Checkers. La plantilla se conserva por si alguna vez se quiere
+# levantar el stack sin depender de la nube, lo que ademas implicaria configurar PostgREST.
 database:
-  enabled: true
+  enabled: false
   image:
     repository: postgres
     tag: 15-alpine
@@ -15,9 +19,9 @@ database:
     postgresUser: postgres
     postgresPassword: postgrespassword
 
-# Componente Auxiliar: PostgREST Engine
+# Componente auxiliar: PostgREST. Apagado, va de la mano con la base local.
 postgrest:
-  enabled: true
+  enabled: false
   image:
     repository: postgrest/postgrest
     tag: v12.0.2
@@ -26,9 +30,9 @@ postgrest:
     type: ClusterIP
     port: 3000
 
-# Componente Auxiliar: Supabase REST Proxy
+# Componente auxiliar: proxy REST. Apagado, va de la mano con la base local.
 supabaseRest:
-  enabled: true
+  enabled: false
   image:
     repository: nginx
     tag: alpine
@@ -97,5 +101,52 @@ mockDnsApi:
   env:
     port: "8081"
 
-# Componentes con dependencia externa:
-# - healthChecker (Otto / T-32): Pendiente entrega de Dockerfile en C por parte del autor.
+# Componente 5: Health Checkers (GNU C)
+#
+# Una instancia por ubicacion simulada. La penalizacion hace que cada una reporte un round-trip
+# distinto para la misma IP, que es lo que necesita la estrategia round-trip para tener con que
+# comparar.
+healthChecker:
+  enabled: true
+  image:
+    repository: health-checker
+    tag: latest
+    pullPolicy: Never
+  env:
+    syncIntervalSeconds: "30"
+  instances:
+    - id: cr
+      instanceId: hc-cr-sjo
+      country: CR
+      city: San Jose
+      latitude: "9.928100"
+      longitude: "-84.090700"
+      penaltyMs: "0.0"
+    - id: us
+      instanceId: hc-us-nyc
+      country: US
+      city: New York
+      latitude: "40.712800"
+      longitude: "-74.006000"
+      penaltyMs: "45.0"
+    - id: eu
+      instanceId: hc-eu-fra
+      country: DE
+      city: Frankfurt
+      latitude: "50.110900"
+      longitude: "8.682100"
+      penaltyMs: "120.0"
+
+# Credenciales de Supabase, usadas por el DNS API y por los Health Checkers.
+#
+# No tienen valor por omision: se pasan al instalar, para que no queden escritas en el repositorio.
+#
+#   helm install dns-stack ./helm/dns-stack \
+#     --set supabase.url=https://xxxxx.supabase.co \
+#     --set supabase.serviceRoleKey=LA_LLAVE
+supabase:
+  create: true
+  url: ""
+  serviceRoleKey: ""
+  # Para reutilizar un Secret creado por fuera, poner create en false y el nombre aqui.
+  existingSecret: ""

@@ -9,6 +9,7 @@ data:
   POSTGRES_USER: {{ .Values.database.env.postgresUser | quote }}
   DNS_API_HOST: {{ .Values.dnsApi.env.host | quote }}
   DNS_API_PORT: {{ .Values.dnsApi.env.port | quote }}
+  DNS_API_MAX_THREADS: {{ .Values.dnsApi.env.maxThreads | quote }}
   DNS_SERVER_IP: {{ .Values.dnsApi.env.dnsServerIp | quote }}
   DNS_SERVER_PORT: {{ .Values.dnsApi.env.dnsServerPort | quote }}
   DNS_TIMEOUT_MS: {{ .Values.dnsApi.env.dnsTimeoutMs | quote }}

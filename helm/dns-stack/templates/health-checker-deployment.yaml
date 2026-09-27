@@ -1,0 +1,50 @@
+{{- if .Values.healthChecker.enabled }}
+# Health Checkers en GNU C.
+#
+# Se despliega una instancia por ubicacion simulada. Cada una reporta un round-trip time distinto
+# para la misma IP gracias a su penalizacion, que es lo que permite probar la estrategia round-trip.
+# No llevan Service: no reciben trafico, solo escriben sus resultados en Supabase.
+{{- range .Values.healthChecker.instances }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "dns-stack.fullname" $ }}-checker-{{ .id }}
+  labels:
+    app: health-checker
+    instance: {{ .id }}
+    {{- include "dns-stack.labels" $ | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: health-checker
+      instance: {{ .id }}
+  template:
+    metadata:
+      labels:
+        app: health-checker
+        instance: {{ .id }}
+    spec:
+      containers:
+        - name: health-checker
+          image: "{{ $.Values.healthChecker.image.repository }}:{{ $.Values.healthChecker.image.tag }}"
+          imagePullPolicy: {{ $.Values.healthChecker.image.pullPolicy }}
+          env:
+            - name: INSTANCE_ID
+              value: {{ .instanceId | quote }}
+            - name: INSTANCE_COUNTRY
+              value: {{ .country | quote }}
+            - name: INSTANCE_CITY
+              value: {{ .city | quote }}
+            - name: INSTANCE_LAT
+              value: {{ .latitude | quote }}
+            - name: INSTANCE_LON
+              value: {{ .longitude | quote }}
+            - name: SIMULATED_RTT_PENALTY_MS
+              value: {{ .penaltyMs | quote }}
+            - name: SYNC_INTERVAL_SECONDS
+              value: {{ $.Values.healthChecker.env.syncIntervalSeconds | quote }}
+            {{- include "dns-stack.supabaseEnv" $ | nindent 12 }}
+{{- end }}
+{{- end }}
