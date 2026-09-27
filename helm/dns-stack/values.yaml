@@ -83,6 +83,10 @@ dnsUi:
     tag: latest
     pullPolicy: Never
   service:
+    # En la nube el proveedor le asigna una IP publica. En local, Docker Desktop lo emula publicando
+    # el puerto 80 de la maquina, asi que ese puerto tiene que estar libre: si el stack de Docker
+    # Compose esta levantado, lo tiene ocupado y el servicio no se puede crear.
+    # Alternativa para entornos sin balanceador: --set dnsUi.service.type=NodePort
     type: LoadBalancer
     port: 80
   env:
