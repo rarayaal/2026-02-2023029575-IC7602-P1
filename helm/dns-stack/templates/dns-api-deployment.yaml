@@ -24,16 +24,6 @@ spec:
             - containerPort: 8080
               name: http
           env:
-            - name: SUPABASE_URL
-              valueFrom:
-                configMapKeyRef:
-                  name: {{ include "dns-stack.fullname" . }}-config
-                  key: SUPABASE_URL
-            - name: SUPABASE_SERVICE_ROLE_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "dns-stack.fullname" . }}-secret
-                  key: SUPABASE_SERVICE_ROLE_KEY
             - name: DNS_API_HOST
               valueFrom:
                 configMapKeyRef:
