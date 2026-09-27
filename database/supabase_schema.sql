@@ -34,6 +34,7 @@ DO $$ BEGIN
 EXCEPTION
     WHEN duplicate_object THEN null;
 END $$;
+
 -- <<< FIN MIGRACIÓN: 01_extensions_and_enums.sql <<<
 
 -- >>> INICIO MIGRACIÓN: 02_dns_records.sql >>>
@@ -62,6 +63,7 @@ COMMENT ON TABLE dns_records IS 'Dominios interceptados y estrategia de resoluci
 COMMENT ON COLUMN dns_records.domain_name IS 'Nombre de dominio sin trailing dot o normalizado en minúsculas';
 COMMENT ON COLUMN dns_records.record_type IS 'Estrategia de resolución DNS: single, multi, weight, round-trip, geo';
 COMMENT ON COLUMN dns_records.ttl IS 'Time to Live en segundos retornado en el paquete DNS';
+
 -- <<< FIN MIGRACIÓN: 02_dns_records.sql <<<
 
 -- >>> INICIO MIGRACIÓN: 03_dns_record_targets.sql >>>
@@ -96,6 +98,7 @@ COMMENT ON COLUMN dns_record_targets.weight IS 'Peso relativo para balanceo prob
 COMMENT ON COLUMN dns_record_targets.country_code IS 'Código ISO de país (2 letras) para resolución geográfica (estrategia geo)';
 COMMENT ON COLUMN dns_record_targets.is_healthy IS 'Estado consolidado por mayoría simple entre Health Checkers';
 COMMENT ON COLUMN dns_record_targets.last_check_at IS 'Fecha y hora de la última evaluación de salud';
+
 -- <<< FIN MIGRACIÓN: 03_dns_record_targets.sql <<<
 
 -- >>> INICIO MIGRACIÓN: 04_health_check_configs.sql >>>
@@ -136,6 +139,7 @@ COMMENT ON COLUMN health_check_configs.basic_auth_pass IS 'Contraseña para aute
 COMMENT ON COLUMN health_check_configs.timeout_ms IS 'Tiempo de espera máximo en milisegundos por intento';
 COMMENT ON COLUMN health_check_configs.retries IS 'Número de reintentos antes de marcar el intento como fallido';
 COMMENT ON COLUMN health_check_configs.interval_seconds IS 'Frecuencia en segundos con la que el Health Checker ejecuta la prueba';
+
 -- <<< FIN MIGRACIÓN: 04_health_check_configs.sql <<<
 
 -- >>> INICIO MIGRACIÓN: 05_checker_instances.sql >>>
@@ -163,6 +167,7 @@ COMMENT ON COLUMN checker_instances.city IS 'Ciudad donde simula estar el checke
 COMMENT ON COLUMN checker_instances.latitude IS 'Latitud (-90 a 90) para cálculo de distancias esféricas';
 COMMENT ON COLUMN checker_instances.longitude IS 'Longitud (-180 a 180) para cálculo de distancias esféricas';
 COMMENT ON COLUMN checker_instances.last_heartbeat IS 'Último latido enviado por el contenedor para verificar que sigue vivo';
+
 -- <<< FIN MIGRACIÓN: 05_checker_instances.sql <<<
 
 -- >>> INICIO MIGRACIÓN: 06_health_check_results.sql >>>
@@ -196,10 +201,11 @@ COMMENT ON COLUMN health_check_results.rtt_ms IS 'Round-Trip Time medido en mili
 COMMENT ON COLUMN health_check_results.http_code IS 'Código HTTP devuelto por el servidor si el protocolo fue HTTP';
 COMMENT ON COLUMN health_check_results.error_message IS 'Descripción del fallo en caso de error o timeout';
 COMMENT ON COLUMN health_check_results.checked_at IS 'Marca de tiempo en que finalizó la prueba';
+
 -- <<< FIN MIGRACIÓN: 06_health_check_results.sql <<<
 
--- >>> INICIO MIGRACIÓN: 07_consensus_majority.sql (Refinada en 09_consensus_refinement.sql) >>>
--- View: Último reporte de salud de cada target por cada instancia activa y no obsoleta
+-- >>> INICIO MIGRACIÓN: 07_consensus_majority.sql >>>
+-- View: Último reporte de salud de cada target por cada instancia activa
 CREATE OR REPLACE VIEW view_latest_instance_health AS
 SELECT DISTINCT ON (hcr.target_id, hcr.instance_id)
     hcr.target_id,
@@ -211,8 +217,6 @@ SELECT DISTINCT ON (hcr.target_id, hcr.instance_id)
 FROM health_check_results hcr
 JOIN checker_instances ci ON ci.instance_id = hcr.instance_id
 WHERE ci.is_active = TRUE
-  AND ci.last_heartbeat >= (NOW() - INTERVAL '2 minutes')
-  AND hcr.checked_at >= (NOW() - INTERVAL '5 minutes')
 ORDER BY hcr.target_id, hcr.instance_id, hcr.checked_at DESC;
 
 -- View: Consenso de Mayoría Simple por cada target
@@ -265,7 +269,7 @@ DECLARE
     v_healthy_votes INTEGER;
     v_new_status BOOLEAN;
 BEGIN
-    -- Contar votos de la última evaluación de cada instancia activa y reciente
+    -- Contar votos de la última evaluación de cada instancia activa
     SELECT 
         COUNT(*),
         COUNT(*) FILTER (WHERE status = 'healthy')
@@ -298,6 +302,7 @@ CREATE TRIGGER trg_after_health_check_insert
 AFTER INSERT ON health_check_results
 FOR EACH ROW
 EXECUTE FUNCTION trg_fn_update_target_consensus();
+
 -- <<< FIN MIGRACIÓN: 07_consensus_majority.sql <<<
 
 -- >>> INICIO MIGRACIÓN: 08_ip_to_country.sql >>>
@@ -376,8 +381,113 @@ $$ LANGUAGE plpgsql STABLE;
 COMMENT ON TABLE ip_to_country IS 'Mapeo de rangos IPv4 a países y coordenadas geográficas para resolución geo y round-trip';
 COMMENT ON COLUMN ip_to_country.ip_start IS 'Límite inferior del rango IPv4 en representación numérica entera';
 COMMENT ON COLUMN ip_to_country.ip_end IS 'Límite superior del rango IPv4 en representación numérica entera';
+
 -- <<< FIN MIGRACIÓN: 08_ip_to_country.sql <<<
 
+-- >>> INICIO MIGRACIÓN: 09_consensus_refinement.sql >>>
+-- View: Último reporte de salud de cada target por cada instancia activa
+-- Se descartan instancias inactivas (sin heartbeat reciente) y reportes obsoletos
+CREATE OR REPLACE VIEW view_latest_instance_health AS
+SELECT DISTINCT ON (hcr.target_id, hcr.instance_id)
+    hcr.target_id,
+    hcr.instance_id,
+    hcr.status,
+    hcr.rtt_ms,
+    hcr.http_code,
+    hcr.checked_at
+FROM health_check_results hcr
+JOIN checker_instances ci ON ci.instance_id = hcr.instance_id
+WHERE ci.is_active = TRUE
+  AND ci.last_heartbeat >= (NOW() - INTERVAL '2 minutes')
+  AND hcr.checked_at >= (NOW() - INTERVAL '5 minutes')
+ORDER BY hcr.target_id, hcr.instance_id, hcr.checked_at DESC;
+
+-- 2. Vista de Consenso de Mayoría Simple por cada target
+CREATE OR REPLACE VIEW view_target_consensus AS
+WITH latest_checks AS (
+    SELECT 
+        target_id,
+        instance_id,
+        status,
+        rtt_ms,
+        checked_at
+    FROM view_latest_instance_health
+),
+aggregated AS (
+    SELECT
+        target_id,
+        COUNT(*) AS total_reporting_instances,
+        COUNT(*) FILTER (WHERE status = 'healthy') AS healthy_votes,
+        COUNT(*) FILTER (WHERE status = 'unhealthy') AS unhealthy_votes,
+        AVG(rtt_ms) AS avg_rtt_ms,
+        MIN(rtt_ms) AS min_rtt_ms,
+        MAX(checked_at) AS last_check_at
+    FROM latest_checks
+    GROUP BY target_id
+)
+SELECT
+    t.id AS target_id,
+    t.record_id,
+    t.ip_address,
+    COALESCE(a.total_reporting_instances, 0) AS total_reporting_instances,
+    COALESCE(a.healthy_votes, 0) AS healthy_votes,
+    COALESCE(a.unhealthy_votes, 0) AS unhealthy_votes,
+    COALESCE(a.avg_rtt_ms, 0.0) AS avg_rtt_ms,
+    COALESCE(a.min_rtt_ms, 0.0) AS min_rtt_ms,
+    a.last_check_at,
+    CASE 
+        -- Mayoría Simple: healthy_votes > (total / 2)
+        WHEN a.total_reporting_instances IS NULL OR a.total_reporting_instances = 0 THEN TRUE
+        WHEN a.healthy_votes > (a.total_reporting_instances / 2.0) THEN TRUE
+        ELSE FALSE
+    END AS consensus_is_healthy
+FROM dns_record_targets t
+LEFT JOIN aggregated a ON a.target_id = t.id;
+
+-- Función PostgreSQL + Trigger para actualizar automáticamente dns_record_targets.is_healthy
+CREATE OR REPLACE FUNCTION trg_fn_update_target_consensus()
+RETURNS TRIGGER AS $$
+DECLARE
+    v_total_instances INTEGER;
+    v_healthy_votes INTEGER;
+    v_new_status BOOLEAN;
+BEGIN
+    -- Contar votos de la última evaluación de cada instancia activa
+    SELECT 
+        COUNT(*),
+        COUNT(*) FILTER (WHERE status = 'healthy')
+    INTO 
+        v_total_instances,
+        v_healthy_votes
+    FROM view_latest_instance_health
+    WHERE target_id = NEW.target_id;
+
+    -- Calcular mayoría simple
+    IF v_total_instances > 0 THEN
+        v_new_status := (v_healthy_votes > (v_total_instances / 2.0));
+        
+        -- Actualizar el estado consolidado directamente en el target
+        UPDATE dns_record_targets
+        SET 
+            is_healthy = v_new_status,
+            last_check_at = NEW.checked_at,
+            updated_at = NOW()
+        WHERE id = NEW.target_id;
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Trigger: se dispara después de insertar una medición en health_check_results
+DROP TRIGGER IF EXISTS trg_after_health_check_insert ON health_check_results;
+CREATE TRIGGER trg_after_health_check_insert
+AFTER INSERT ON health_check_results
+FOR EACH ROW
+EXECUTE FUNCTION trg_fn_update_target_consensus();
+
+
+-- <<< FIN MIGRACIÓN: 09_consensus_refinement.sql <<<
 
 -- >>> INICIO MIGRACIÓN: 10_seed_ip_to_country.sql >>>
 -- Poblado de datos iniciales para la tabla ip_to_country
@@ -416,5 +526,6 @@ VALUES
     -- Cloudflare DNS Anycast (AU / Global)
     (inet_to_bigint('1.1.1.0'),     inet_to_bigint('1.1.1.255'),     'AU', 'Australia', 'Sydney', -33.868800, 151.209300)
 ON CONFLICT DO NOTHING;
+
 -- <<< FIN MIGRACIÓN: 10_seed_ip_to_country.sql <<<
 
