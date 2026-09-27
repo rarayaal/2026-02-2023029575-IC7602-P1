@@ -26,7 +26,7 @@ services:
     # Copiar dns-api/.env.example como dns-api/.env y completarlo antes de levantar el stack.
     env_file:
       - path: ./dns-api/.env
-        required: false
+        required: true
     environment:
       DNS_API_HOST: "0.0.0.0"
       DNS_API_PORT: "8080"
@@ -77,7 +77,7 @@ services:
     container_name: health-checker-cr
     env_file:
       - path: ./dns-api/.env
-        required: false
+        required: true
     environment:
       INSTANCE_ID: "hc-cr-sjo"
       INSTANCE_COUNTRY: "CR"
@@ -95,7 +95,7 @@ services:
     container_name: health-checker-us
     env_file:
       - path: ./dns-api/.env
-        required: false
+        required: true
     environment:
       INSTANCE_ID: "hc-us-nyc"
       INSTANCE_COUNTRY: "US"
@@ -113,7 +113,7 @@ services:
     container_name: health-checker-eu
     env_file:
       - path: ./dns-api/.env
-        required: false
+        required: true
     environment:
       INSTANCE_ID: "hc-eu-fra"
       INSTANCE_COUNTRY: "DE"
@@ -135,7 +135,8 @@ services:
     environment:
       VITE_API_URL: ""
     depends_on:
-      - dns-api
+      dns-api:
+        condition: service_healthy
     restart: always
 
 networks:

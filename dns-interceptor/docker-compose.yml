@@ -1,12 +1,10 @@
-version: "3.8"
-
 services:
   # Mock del DNS API
   mock-dns-api:
     build:
       context: .
       dockerfile: Dockerfile
-    command: ./mock_dns_api
+    entrypoint: ["./mock_dns_api"]
     ports:
       - "8081:8081"
     environment:
@@ -19,7 +17,6 @@ services:
       dockerfile: Dockerfile
     command: ./dns-interceptor
     ports:
-      - "53:53/udp"
       - "5354:5354/udp"
     environment:
       INTERCEPTOR_BIND_ADDR: "0.0.0.0"

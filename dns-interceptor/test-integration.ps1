@@ -25,7 +25,20 @@ try {
     docker-compose down 2>&1 | Out-Null  # Limpia si habia algo anterior
     Start-Sleep -Seconds 2
     docker-compose up -d
+    if ($LASTEXITCODE -ne 0) {
+        throw "No se pudieron levantar los servicios Docker"
+    }
     Start-Sleep -Seconds 3  # Espera a que los servicios esten listos
+
+    $services = docker-compose ps --services
+    $running = docker-compose ps --status running --services
+    foreach ($service in $services) {
+        if ($running -notcontains $service) {
+            docker-compose ps
+            docker-compose logs $service
+            throw "El servicio '$service' no esta corriendo"
+        }
+    }
 } finally {
     Pop-Location
 }
@@ -34,9 +47,9 @@ Write-Host "[OK] Servicios levantados" -ForegroundColor Green
 
 # Test 1: StandardQuery para example.com
 Write-Host "`n[2/5] Test 1: StandardQuery (example.com tipo A)..."
-$Test1Pass = $false
 try {
     $socket = [System.Net.Sockets.UdpClient]::new()
+    $socket.Client.ReceiveTimeout = 5000
     $socket.Connect("127.0.0.1", 5354)
     
     # Paquete DNS: header (12 bytes) + Question para example.com A IN
@@ -67,7 +80,6 @@ try {
         throw "Bit QR no esta prendido (respuesta no valida)"
     }
     
-    $Test1Pass = $true
     Write-Host "[OK] StandardQuery recibio respuesta valida ($($response.Length) bytes, QR=1)" -ForegroundColor Green
 } catch {
     Write-Host "[FAIL] StandardQuery fallo: $_" -ForegroundColor Red
@@ -76,9 +88,9 @@ try {
 
 # Test 2: NonStandardQuery (OPCODE=1, IQUERY)
 Write-Host "`n[3/5] Test 2: NonStandardQuery (OPCODE=1)..."
-$Test2Pass = $false
 try {
     $socket = [System.Net.Sockets.UdpClient]::new()
+    $socket.Client.ReceiveTimeout = 5000
     $socket.Connect("127.0.0.1", 5354)
     
     # Mismo paquete pero con OPCODE=1 (IQUERY) en el byte 2
@@ -109,7 +121,6 @@ try {
         throw "Bit QR no esta prendido (mock_dns_api deberia haberlo prendido)"
     }
     
-    $Test2Pass = $true
     Write-Host "[OK] NonStandardQuery delegado al mock_dns_api, respuesta valida ($($response.Length) bytes, QR=1)" -ForegroundColor Green
 } catch {
     Write-Host "[FAIL] NonStandardQuery fallo: $_" -ForegroundColor Red
@@ -118,7 +129,6 @@ try {
 
 # Test 3: Validar logs
 Write-Host "`n[4/5] Validando logs..."
-$Test3Pass = $false
 try {
     Push-Location $ScriptDir
     $logs = docker-compose logs dns-interceptor 2>&1 | Select-Object -Last 10
@@ -127,9 +137,8 @@ try {
     $logsStr = $logs | Out-String
     if ($logsStr -match "escuchando en udp") {
         Write-Host "[OK] Interceptor levanto correctamente (log: escuchando en udp)" -ForegroundColor Green
-        $Test3Pass = $true
     } else {
-        Write-Host "[WARN] No se encontro el log de inicializacion (puede ser ignorable si esta escuchando)" -ForegroundColor Yellow
+        throw "No se encontro el log de inicializacion del interceptor"
     }
 } finally {
     Pop-Location
