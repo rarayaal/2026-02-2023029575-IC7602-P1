@@ -1,34 +1,19 @@
-# Orquestación del Stack DNS - T-38 (Rama Alexandra)
-# Nota: Orquesta los componentes funcionales existentes en la rama Alexandra:
-# 1. database (PostgreSQL + Migraciones SQL de /database/migrations)
-# 2. dns-api (API REST en Java, conectada a Supabase) y su mock en Rust para pruebas aisladas
-# 3. dns-interceptor (Interceptador DNS UDP/TCP en Rust)
-# 4. dns-ui (Interfaz Web React + Vite servida por Nginx)
+# Orquestación del Stack DNS - T-38
 #
-# PENDIENTES DE INTEGRACIÓN (Esperando Dockerfiles de compañeros):
-# - dns-api (Luis / T-23): Integrado. API REST en Java con Javalin, conectada a Supabase.
-# - health-checker (Otto / T-32): Pendiente entrega de Dockerfile en C.
+# Levanta el sistema completo con un solo comando:
+#
+#   docker compose up -d --build
+#
+# Requisito previo: copiar dns-api/.env.example como dns-api/.env y completar las credenciales de
+# Supabase. Ese archivo lo comparten el DNS API y los Health Checkers.
+#
+# Componentes:
+# 1. dns-api            API REST en Java (Javalin), conectada a Supabase
+# 2. dns-interceptor    Interceptor DNS sobre UDP, en Rust
+# 3. checker-cr/us/eu   Health Checkers en GNU C, en tres ubicaciones simuladas
+# 4. dns-ui             Interfaz web en React, servida por Nginx
 
 services:
-  # Base de Datos PostgreSQL con carga inicial de migraciones
-  database:
-    image: postgres:15-alpine
-    container_name: dns-database
-    restart: always
-    environment:
-      POSTGRES_DB: dns_db
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgrespassword
-    ports:
-      - "5432:5432"
-    volumes:
-      - ./database/migrations:/docker-entrypoint-initdb.d:ro
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d dns_db"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
   # DNS API en Java (Javalin). Expone /api/exists, /api/records y /api/dns_resolver.
   dns-api:
     build:
@@ -37,7 +22,7 @@ services:
     container_name: dns-api
     ports:
       - "8080:8080"
-    # Las credenciales de Supabase viven en dns-api/.env, que no se versiona.
+    # Las credenciales de Supabase se leen de dns-api/.env, que no se versiona.
     # Copiar dns-api/.env.example como dns-api/.env y completarlo antes de levantar el stack.
     env_file:
       - path: ./dns-api/.env
@@ -46,14 +31,10 @@ services:
       DNS_API_HOST: "0.0.0.0"
       DNS_API_PORT: "8080"
       DNS_API_MAX_THREADS: "100"
-      SUPABASE_URL: "${SUPABASE_URL:?Define SUPABASE_URL before starting the DNS API}"
-      SUPABASE_SERVICE_ROLE_KEY: "${SUPABASE_SERVICE_ROLE_KEY:?Define SUPABASE_SERVICE_ROLE_KEY before starting the DNS API}"
       # Servidor DNS remoto al que se delegan los paquetes no estandar.
       DNS_SERVER_IP: "8.8.8.8"
       DNS_SERVER_PORT: "53"
       DNS_TIMEOUT_MS: "3000"
-    depends_on:
-      - supabase-rest
     healthcheck:
       # wget viene incluido en la imagen base alpine, no hay que instalar nada.
       test: ["CMD-SHELL", "wget -q -O- http://localhost:8080/api/health || exit 1"]
@@ -84,6 +65,64 @@ services:
       dns-api:
         condition: service_healthy
     restart: always
+
+  # Health Checkers en GNU C. Se levantan tres instancias con ubicaciones geograficas simuladas y
+  # penalizaciones de latencia distintas: es lo que permite probar la estrategia round-trip, porque
+  # cada una reporta un tiempo de respuesta diferente para la misma IP.
+  # Las credenciales salen del mismo archivo que usa el DNS API.
+  checker-cr:
+    build:
+      context: ./health_checker
+      dockerfile: Dockerfile
+    container_name: health-checker-cr
+    env_file:
+      - path: ./dns-api/.env
+        required: false
+    environment:
+      INSTANCE_ID: "hc-cr-sjo"
+      INSTANCE_COUNTRY: "CR"
+      INSTANCE_CITY: "San Jose"
+      INSTANCE_LAT: "9.928100"
+      INSTANCE_LON: "-84.090700"
+      SIMULATED_RTT_PENALTY_MS: "0.0"
+      SYNC_INTERVAL_SECONDS: "30"
+    restart: unless-stopped
+
+  checker-us:
+    build:
+      context: ./health_checker
+      dockerfile: Dockerfile
+    container_name: health-checker-us
+    env_file:
+      - path: ./dns-api/.env
+        required: false
+    environment:
+      INSTANCE_ID: "hc-us-nyc"
+      INSTANCE_COUNTRY: "US"
+      INSTANCE_CITY: "New York"
+      INSTANCE_LAT: "40.712800"
+      INSTANCE_LON: "-74.006000"
+      SIMULATED_RTT_PENALTY_MS: "45.0"
+      SYNC_INTERVAL_SECONDS: "30"
+    restart: unless-stopped
+
+  checker-eu:
+    build:
+      context: ./health_checker
+      dockerfile: Dockerfile
+    container_name: health-checker-eu
+    env_file:
+      - path: ./dns-api/.env
+        required: false
+    environment:
+      INSTANCE_ID: "hc-eu-fra"
+      INSTANCE_COUNTRY: "DE"
+      INSTANCE_CITY: "Frankfurt"
+      INSTANCE_LAT: "50.110900"
+      INSTANCE_LON: "8.682100"
+      SIMULATED_RTT_PENALTY_MS: "120.0"
+      SYNC_INTERVAL_SECONDS: "30"
+    restart: unless-stopped
 
   # Interfaz Web de Administración DNS (React + Vite + Nginx)
   dns-ui:
