@@ -118,9 +118,6 @@ mayoría simple actualiza el estado de la IP. Con eso se cerró el problema P-08
 T-27 y T-28 siguen sin llegar al 100% porque todos los chequeos comparten un intervalo global
 tomado de una variable de entorno, en lugar del intervalo configurado para cada health check.
 
-La tabla IP-to-Country se carga con una migración de datos que incluye rangos de varios países con
-sus coordenadas.
-
 ### DNS UI y orquestación (Alexandra De Gracia)
 
 | ID   | Tarea                          | Estado      | Avance | Problemas |
@@ -199,6 +196,7 @@ Período del 18/09/2026 al 24/09/2026. No se incluyen los commits de merge.
 | Alexandra De Gracia | PR #14 | Consumo del DNS API desde la interfaz y contenedor de la UI | Mergeado | T-33 a T-37, T-39 |
 | Otto Segura | PR #15 | Consenso, round-trip de alta resolución, carga de IP-to-Country y contenedor | Mergeado | T-29 a T-32 |
 | Rafael Araya | PR #16 | Ajuste de los modelos al contrato y correcciones del motor de resolución | Mergeado | T-09 a T-14 |
+| Luis Delgado | PR #17 | Correcciones de compilación del Interceptor y del Health Checker, e integración de las tres instancias al Docker Compose | Mergeado | T-13, T-27 a T-30, T-38 |
 
 ---
 
@@ -238,7 +236,7 @@ Período del 18/09/2026 al 24/09/2026. No se incluyen los commits de merge.
 | ---------- | ---------------: | ------: | --: | ----------------------------- |
 | Isaac Rojas Robles | 8 | 1 | 1 | Integración del Interceptor con el DNS API y documentación del componente |
 | Rafael Araya Álvarez | 8 | 1 | 1 | Ajuste de los modelos al contrato del API y correcciones del motor de resolución |
-| Luis Diego Delgado Muñoz | 9 | 11 | 1 | Cliente UDP/DNS, `/api/dns_resolver`, CRUD de IP-to-Country con búsqueda por IP, CRUD de health checks, Dockerfile del API e integración al Docker Compose |
+| Luis Diego Delgado Muñoz | 9 | 11 | 2 | Cliente UDP/DNS, `/api/dns_resolver`, CRUD de IP-to-Country con búsqueda por IP, CRUD de health checks, Dockerfile del API, integración al Docker Compose y corrección de los defectos que impedían construir el Interceptor y el Health Checker |
 | Otto Segura Ruiz | 8 | 3 | 1 | Registro de instancias y consenso en Supabase, round-trip de alta resolución con penalización simulada, carga de IP-to-Country y contenedor del Health Checker |
 | Alexandra De Gracia | 8 | 3 | 2 | Consumo del DNS API desde la interfaz, contenedor con Nginx y orquestación del stack con Docker Compose y Helm |
 
@@ -257,7 +255,7 @@ La entrega es el 28/09/2026.
 | T-24         | Colección de Postman del DNS API | Luis Delgado | Colección exportada como evidencia de las pruebas |
 | T-40, T-08   | Documentar la prueba end-to-end y los casos probados con `nslookup` | Alexandra De Gracia, Isaac Rojas | Pruebas reproducibles paso a paso |
 | T-14, P-21   | Completar `round-trip` con la ubicación del cliente | Rafael Araya | La IP escogida depende de la cercanía al cliente |
-| P-19         | Completar o recortar los Helm Charts | Alexandra De Gracia | El despliegue en Kubernetes funciona o se documenta su alcance |
+| P-19         | Completar los Helm Charts | Alexandra De Gracia | El despliegue en Kubernetes funciona o se documenta su alcance |
 | P-20         | Resolver el HTTPS entre el Interceptor y el API | Isaac Rojas, Luis Delgado | Comunicación cifrada o limitación documentada |
 | P-22         | Eliminar el script en Python | Otto Segura | El repositorio no contiene código en un lenguaje prohibido |
 | T-44         | Grabar el video de demostración | Todos | Video de máximo diez minutos con una sección por integrante |
@@ -270,13 +268,11 @@ El sistema completo quedó funcionando de punta a punta. Con `docker compose up 
 levantan seis contenedores —el DNS API, el DNS Interceptor, las tres instancias del Health Checker y
 la interfaz web— y el flujo se verificó así: se creó un registro por medio del API, se consultó con
 `nslookup` contra el Interceptor y este devolvió la IP almacenada, aplicando la estrategia
-configurada. También se comprobó el otro camino: un dominio que no está en la base se delega al API,
-que lo resuelve contra un servidor DNS remoto y devuelve la respuesta al cliente.
+configurada.
 
 Esa verificación destapó tres defectos que impedían construir el proyecto (P-15, P-16 y P-18) y uno
 que impedía demostrarlo (P-17). Los cuatro se corrigieron durante la semana. Vale la pena notar que
-los tres primeros no se detectaban trabajando en cada componente por separado: aparecieron solo al
+los tres primeros no se detectaban trabajando en cada componente por separado y aparecieron solo al
 integrar y levantar todo junto, que es la razón por la que conviene hacerlo antes del último día.
 
-Lo que queda es principalmente documentación: el enunciado califica con cero si no se entrega, y hoy
-es lo más atrasado del proyecto frente al código.
+Lo que queda es principalmente documentación y el enunciado califica con cero si no se entrega.

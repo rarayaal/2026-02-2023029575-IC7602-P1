@@ -49,6 +49,12 @@ spec:
                 configMapKeyRef:
                   name: {{ include "dns-stack.fullname" . }}-config
                   key: DNS_TIMEOUT_MS
+            - name: DNS_API_MAX_THREADS
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "dns-stack.fullname" . }}-config
+                  key: DNS_API_MAX_THREADS
+            {{- include "dns-stack.supabaseEnv" . | nindent 12 }}
           livenessProbe:
             httpGet:
               path: /api/health
