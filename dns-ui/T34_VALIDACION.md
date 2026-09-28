@@ -37,7 +37,7 @@ Se validó la interfaz funcional y la creación exitosa de los cinco tipos de re
 
 Se validó la funcionalidad de edición para todos los registros existentes y de los cinco tipos soportados (`Single`, `Multi`, `Weight`, `Round-Trip`, `Geo`):
 
-- **Carga de Datos**: Al hacer clic en el botón de edición (`✏️`), el modal carga automáticamente todos los datos actuales del registro seleccionado (`domain`, `type`, `ttl`, `healthCheck`, e información específica del tipo).
+- **Carga de Datos**: Al hacer clic en el botón de edición, el modal carga automáticamente todos los datos actuales del registro seleccionado (`domain`, `type`, `ttl`, `healthCheck`, e información específica del tipo).
 - **Modificación**: Se permite editar cualquier campo común o específico, así como cambiar el tipo de registro o agregar/eliminar filas dinámicas.
 - **Guardado**: Los cambios se procesan mediante `dnsService.updateRecord(id, updatedData)`.
 - **Actualización Visual**: La tabla refleja de inmediato los datos modificados.
@@ -48,11 +48,11 @@ Se validó la funcionalidad de edición para todos los registros existentes y de
 
 Se validó el flujo completo de eliminación de registros DNS desde la tabla:
 
-- **Confirmación previa**: Al presionar el botón de eliminar (`🗑️`), se despliega una ventana emergente de confirmación.
+- **Confirmación previa**: Al presionar el botón de eliminar, se despliega una ventana emergente de confirmación.
 - **Identificación del registro**: El modal de confirmación muestra explícitamente el **Dominio**, **ID**, **Tipo** e **IP/Información principal** del registro a eliminar.
 - **Cancelación**: Al cancelar, el modal se cierra y no se modifica ningún dato en el sistema.
 - **Eliminación**: Al confirmar, se invoca `dnsService.deleteRecord(id)`. El registro se elimina del estado mock local.
-- **Actualización e Interfaz**: La tabla se refresca de inmediato, el registro eliminado desaparece de la vista y se despliega una notificación de éxito (`✅ Registro DNS (...) eliminado exitosamente`).
+- **Actualización e Interfaz**: La tabla se refresca de inmediato, el registro eliminado desaparece de la vista y se despliega una notificación de éxito (`Registro DNS (...) eliminado exitosamente`).
 
 ---
 

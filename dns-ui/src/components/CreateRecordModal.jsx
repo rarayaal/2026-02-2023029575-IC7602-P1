@@ -237,8 +237,8 @@ function CreateRecordModal({
         <div className="modal-header">
           <h3 className="modal-title">
             {isEditMode
-              ? `✏️ Editar Registro DNS (${initialData.id})`
-              : '➕ Agregar Nuevo Registro DNS'}
+              ? `Editar Registro DNS (${initialData.id})`
+              : 'Agregar Nuevo Registro DNS'}
           </h3>
           <button className="modal-close-btn" onClick={handleClose}>
             ✕
@@ -354,7 +354,7 @@ function CreateRecordModal({
                         className="btn-remove-row"
                         title="Eliminar fila"
                       >
-                        🗑️
+                        Eliminar
                       </button>
                     )}
                   </div>
@@ -364,7 +364,7 @@ function CreateRecordModal({
                   onClick={handleAddWeightItem}
                   className="btn-add-row"
                 >
-                  ➕ Agregar Target / Peso
+                  Agregar Target / Peso
                 </button>
               </div>
             )}
@@ -392,7 +392,7 @@ function CreateRecordModal({
                         className="btn-remove-row"
                         title="Eliminar fila"
                       >
-                        🗑️
+                        Eliminar
                       </button>
                     )}
                   </div>
@@ -402,7 +402,7 @@ function CreateRecordModal({
                   onClick={handleAddRoundTripItem}
                   className="btn-add-row"
                 >
-                  ➕ Agregar Target IP
+                  Agregar Target IP
                 </button>
                 <span className="form-hint" style={{ marginTop: '0.5rem', display: 'block' }}>
                   Las mediciones de RTT (latencia en ms) son calculadas automáticamente por los Health Checkers.
@@ -444,7 +444,7 @@ function CreateRecordModal({
                         className="btn-remove-row"
                         title="Eliminar fila"
                       >
-                        🗑️
+                        Eliminar
                       </button>
                     )}
                   </div>
@@ -454,7 +454,7 @@ function CreateRecordModal({
                   onClick={handleAddGeoMapping}
                   className="btn-add-row"
                 >
-                  ➕ Agregar Target País-IP
+                  Agregar Target País-IP
                 </button>
               </div>
             )}

@@ -181,13 +181,13 @@ function DnsRecordsPage() {
           className="btn-primary"
           onClick={() => setIsModalOpen(true)}
         >
-          ➕ Agregar registro
+          Agregar Registro
         </button>
       </header>
 
       {feedback && (
         <div className={`feedback-toast ${feedback.type}`}>
-          <span>{feedback.type === 'success' ? '✅' : '⚠️'}</span>
+          <span>{feedback.type === 'success' ? 'Info:' : 'Atención:'}</span>
           <span>{feedback.text}</span>
           <button
             className="toast-close"
@@ -201,7 +201,6 @@ function DnsRecordsPage() {
       {/* Barra de Filtros y Búsqueda */}
       <div className="filters-bar">
         <div className="search-box">
-          <span className="search-icon">🔍</span>
           <input
             type="text"
             placeholder="Buscar por dominio o IP/info..."
@@ -289,21 +288,21 @@ function DnsRecordsPage() {
                           title="Ver detalle del registro"
                           onClick={() => setViewingRecord(record)}
                         >
-                          👁️
+                          Ver
                         </button>
                         <button
                           className="btn-icon edit"
                           title="Editar Registro"
                           onClick={() => setEditingRecord(record)}
                         >
-                          ✏️
+                          Editar
                         </button>
                         <button
                           className="btn-icon delete"
                           title="Eliminar Registro"
                           onClick={() => setDeletingRecord(record)}
                         >
-                          🗑️
+                          Eliminar
                         </button>
                       </div>
                     </td>
@@ -333,12 +332,12 @@ function DnsRecordsPage() {
         initialData={editingRecord}
       />
 
-      {/* Modal de Visualización Detallada (Boton Ojo 👁️) */}
+      {/* Modal de Visualización Detallada */}
       {viewingRecord && (
         <div className="modal-overlay" onClick={() => setViewingRecord(null)}>
           <div className="modal-container" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '640px' }}>
             <div className="modal-header">
-              <h3 className="modal-title">👁️ Detalle del Registro DNS ({viewingRecord.id})</h3>
+              <h3 className="modal-title">Detalle del Registro DNS ({viewingRecord.id})</h3>
               <button className="modal-close-btn" onClick={() => setViewingRecord(null)}>
                 ✕
               </button>
@@ -430,7 +429,7 @@ function DnsRecordsPage() {
         <div className="modal-overlay" onClick={() => setDeletingRecord(null)}>
           <div className="modal-container" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '480px' }}>
             <div className="modal-header">
-              <h3 className="modal-title">⚠️ Confirmar Eliminación</h3>
+              <h3 className="modal-title">Confirmar Eliminación</h3>
               <button className="modal-close-btn" onClick={() => setDeletingRecord(null)}>
                 ✕
               </button>

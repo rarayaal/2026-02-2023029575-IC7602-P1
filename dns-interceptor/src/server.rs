@@ -76,7 +76,17 @@ async fn procesar_paquete(
                                 // Si el dominio existe localmente, busca el mejor registro segun estrategia
                                 match cliente_api.obtener_registro(&pregunta.qname).await {
                                     Ok(Some(registro)) => {
-                                        if let Some((ip_destino, ttl)) = MotorResolucion::seleccionar_ip_destino(&registro, &ip_cliente_str) {
+                                        let pais_cliente = if registro.tipo == "geo" {
+                                            cliente_api.consultar_pais_ip(&ip_cliente_str).await
+                                        } else {
+                                            None
+                                        };
+
+                                        if let Some((ip_destino, ttl)) = MotorResolucion::seleccionar_ip_destino(
+                                            &registro,
+                                            &ip_cliente_str,
+                                            pais_cliente.as_deref(),
+                                        ) {
                                             let registros = [ResolvedRecord {
                                                 ip: IpAddr::V4(ip_destino),
                                                 ttl,

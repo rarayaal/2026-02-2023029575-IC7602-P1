@@ -5,7 +5,6 @@ function Navbar() {
   return (
     <nav className="navbar">
       <div className="navbar-brand">
-        <span className="brand-logo">🌐</span>
         <span className="brand-title">DNS Admin Panel</span>
       </div>
       <div className="navbar-links">
@@ -14,7 +13,6 @@ function Navbar() {
           end 
           className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
         >
-          <span className="nav-icon">📊</span>
           <span className="nav-label">Dashboard</span>
         </NavLink>
 
@@ -22,7 +20,6 @@ function Navbar() {
           to="/records" 
           className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
         >
-          <span className="nav-icon">📋</span>
           <span className="nav-label">Registros DNS</span>
         </NavLink>
 
@@ -30,7 +27,6 @@ function Navbar() {
           to="/health-checks" 
           className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
         >
-          <span className="nav-icon">❤️</span>
           <span className="nav-label">Health Checks</span>
         </NavLink>
 
@@ -38,7 +34,6 @@ function Navbar() {
           to="/ip-country" 
           className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
         >
-          <span className="nav-icon">🌍</span>
           <span className="nav-label">IP-to-Country</span>
         </NavLink>
       </div>

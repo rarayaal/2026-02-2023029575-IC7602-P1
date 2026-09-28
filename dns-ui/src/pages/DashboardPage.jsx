@@ -79,7 +79,6 @@ function DashboardPage() {
       {/* Tarjetas Principales de Resumen */}
       <div className="stats-grid">
         <div className="stat-card primary">
-          <div className="stat-icon">🌐</div>
           <div className="stat-info">
             <span className="stat-label">Total Registros DNS</span>
             <span className="stat-value">{stats.totalRecords}</span>
@@ -87,7 +86,6 @@ function DashboardPage() {
         </div>
 
         <div className="stat-card success">
-          <div className="stat-icon">💚</div>
           <div className="stat-info">
             <span className="stat-label">Registros Healthy</span>
             <span className="stat-value">{stats.healthChecks.healthy}</span>
@@ -95,7 +93,6 @@ function DashboardPage() {
         </div>
 
         <div className="stat-card danger">
-          <div className="stat-icon">🔴</div>
           <div className="stat-info">
             <span className="stat-label">Registros Unhealthy</span>
             <span className="stat-value">{stats.healthChecks.unhealthy}</span>
@@ -103,7 +100,6 @@ function DashboardPage() {
         </div>
 
         <div className="stat-card info">
-          <div className="stat-icon">⚡</div>
           <div className="stat-info">
             <span className="stat-label">Health Checks Activos</span>
             <span className="stat-value">{stats.healthChecks.active}</span>

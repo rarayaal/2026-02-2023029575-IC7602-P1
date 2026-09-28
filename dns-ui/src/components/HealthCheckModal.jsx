@@ -229,8 +229,8 @@ function HealthCheckModal({
         <div className="modal-header">
           <h3 className="modal-title">
             {isEditMode
-              ? `✏️ Editar Health Check (${initialData.id})`
-              : '➕ Agregar Nuevo Health Check'}
+              ? `Editar Health Check (${initialData.id})`
+              : 'Agregar Nuevo Health Check'}
           </h3>
           <button className="modal-close-btn" onClick={handleClose}>
             ✕
@@ -334,7 +334,7 @@ function HealthCheckModal({
           {type === 'HTTP' && (
             <div className="type-fields-section">
               <div className="fields-section-title">
-                ⚙️ Configuración Avanzada HTTP / Basic Auth
+                Configuración Avanzada HTTP / Basic Auth
               </div>
 
               <div className="form-row">
@@ -387,7 +387,7 @@ function HealthCheckModal({
                     onChange={(e) => setUseBasicAuth(e.target.checked)}
                     style={{ width: '16px', height: '16px', accentColor: 'var(--primary)' }}
                   />
-                  🔒 Activar Autenticación Basic Auth
+                  Activar Autenticación Basic Auth
                 </label>
               </div>
 
