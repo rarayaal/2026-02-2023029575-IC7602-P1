@@ -113,6 +113,11 @@ static void evaluate_target(TargetNode *target, size_t index,
 }
 
 int main(void) {
+  /* Salida linea por linea. Dentro de un contenedor la salida no es una terminal sino una tuberia,
+     y por omision C la guarda en un buffer grande: los mensajes no aparecerian en docker logs
+     hasta que el buffer se llene o el proceso termine. */
+  setvbuf(stdout, NULL, _IOLBF, 0);
+
   /* Registro de senales de apagado */
   signal(SIGINT, handle_signal);
   signal(SIGTERM, handle_signal);

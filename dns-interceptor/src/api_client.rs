@@ -118,7 +118,6 @@ impl ClienteApiDns {
             })
     }
 
-    #[allow(dead_code)]
     pub async fn consultar_pais_ip(&self, ip_cliente: &str) -> Option<String> {
         let url = format!("{}/api/ip-country/lookup?ip={}", self.url_base, ip_cliente);
         if let Ok(resp) = self.cliente.get(&url).send().await {
