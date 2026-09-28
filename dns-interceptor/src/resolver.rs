@@ -155,7 +155,10 @@ mod tests {
             peso: Some(1),
             pais: Some(pais.to_string()),
             estado: Some(estado.to_string()),
+            health_check_id: None,
             latencia_promedio_ms: Some(10.0),
+            min_rtt_ms: None,
+            last_check_at: None,
         }
     }
 

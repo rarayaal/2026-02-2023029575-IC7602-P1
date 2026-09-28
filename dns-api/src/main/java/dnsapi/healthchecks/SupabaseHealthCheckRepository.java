@@ -15,7 +15,8 @@ public final class SupabaseHealthCheckRepository implements HealthCheckRepositor
 
     private static final String TABLE = "health_check_configs";
     private static final String COLUMNS = "id,target_id,protocol,port,path,expected_statuses,"
-            + "basic_auth_user,basic_auth_pass,timeout_ms,retries,interval_seconds,is_enabled";
+            + "basic_auth_user,basic_auth_pass,timeout_ms,retries,interval_seconds,is_enabled,"
+            + "dns_record_targets(ip_address)";
 
     /** Codigo con el que Supabase avisa que se violo una restriccion unica. */
     private static final int CONFLICT = 409;
@@ -46,9 +47,11 @@ public final class SupabaseHealthCheckRepository implements HealthCheckRepositor
 
     @Override
     public HealthCheck create(HealthCheck check) {
+        String targetUuid = resolveTargetUuid(check.targetId());
         try {
-            JsonNode created = supabase.post(TABLE, toColumns(check, true));
-            return toCheck(created.get(0));
+            JsonNode created = supabase.post(TABLE, toColumns(check, targetUuid));
+            String newId = created.get(0).get("id").asText();
+            return findById(newId).orElseGet(() -> toCheck(created.get(0)));
         } catch (SupabaseException e) {
             if (e.status() == CONFLICT) {
                 throw new DuplicateHealthCheckException(check.targetId());
@@ -64,14 +67,14 @@ public final class SupabaseHealthCheckRepository implements HealthCheckRepositor
         }
         JsonNode updated;
         try {
-            updated = supabase.patch(TABLE, "id=eq." + SupabaseClient.encode(id), toColumns(check, false));
+            updated = supabase.patch(TABLE, "id=eq." + SupabaseClient.encode(id), toColumns(check, null));
         } catch (SupabaseException e) {
             if (e.status() == CONFLICT) {
                 throw new DuplicateHealthCheckException(check.targetId());
             }
             throw e;
         }
-        return updated.isEmpty() ? Optional.empty() : Optional.of(toCheck(updated.get(0)));
+        return updated.isEmpty() ? Optional.empty() : findById(id);
     }
 
     @Override
@@ -80,6 +83,47 @@ public final class SupabaseHealthCheckRepository implements HealthCheckRepositor
             return false;
         }
         return !supabase.delete(TABLE, "id=eq." + SupabaseClient.encode(id)).isEmpty();
+    }
+
+    private String resolveTargetUuid(String targetIdOrIp) {
+        if (targetIdOrIp == null || targetIdOrIp.isBlank()) {
+            throw new IllegalArgumentException("El campo targetId o IP es obligatorio para el health check");
+        }
+        if (isUuid(targetIdOrIp)) {
+            return targetIdOrIp;
+        }
+
+        // Buscar target por direccion IP en dns_record_targets
+        JsonNode targets = supabase.get("dns_record_targets",
+                "select=id&ip_address=eq." + SupabaseClient.encode(targetIdOrIp) + "&limit=1");
+        if (!targets.isEmpty()) {
+            return targets.get(0).get("id").asText();
+        }
+
+        // Si la IP no existe en ningun registro aun, asociar a un registro predeterminado local
+        JsonNode records = supabase.get("dns_records",
+                "select=id&domain_name=eq.healthcheck.local&limit=1");
+        String recordId;
+        if (!records.isEmpty()) {
+            recordId = records.get(0).get("id").asText();
+        } else {
+            Map<String, Object> newRecord = new LinkedHashMap<>();
+            newRecord.put("domain_name", "healthcheck.local");
+            newRecord.put("record_type", "single");
+            newRecord.put("ttl", 300);
+            newRecord.put("is_active", true);
+            JsonNode createdRecord = supabase.post("dns_records", newRecord);
+            recordId = createdRecord.get(0).get("id").asText();
+        }
+
+        Map<String, Object> newTarget = new LinkedHashMap<>();
+        newTarget.put("record_id", recordId);
+        newTarget.put("ip_address", targetIdOrIp);
+        newTarget.put("weight", 1);
+        newTarget.put("is_healthy", true);
+        newTarget.put("is_active", true);
+        JsonNode createdTarget = supabase.post("dns_record_targets", newTarget);
+        return createdTarget.get(0).get("id").asText();
     }
 
     private static HealthCheck toCheck(JsonNode row) {
@@ -92,9 +136,13 @@ public final class SupabaseHealthCheckRepository implements HealthCheckRepositor
         // La contrasena nunca sale del API: se devuelve en null aunque la base la tenga guardada.
         BasicAuth basicAuth = user == null ? null : new BasicAuth(user, null);
 
+        String targetUuid = textOrNull(row.get("target_id"));
+        String targetIp = textOrNull(row.path("dns_record_targets").get("ip_address"));
+        String targetDisplay = (targetIp != null && !targetIp.isBlank()) ? targetIp : targetUuid;
+
         return new HealthCheck(
                 row.get("id").asText(),
-                textOrNull(row.get("target_id")),
+                targetDisplay,
                 HealthCheckProtocol.fromValue(row.get("protocol").asText()),
                 row.get("port").asInt(),
                 textOrNull(row.get("path")),
@@ -109,13 +157,12 @@ public final class SupabaseHealthCheckRepository implements HealthCheckRepositor
     /**
      * Traduce el health check a columnas de la base.
      *
-     * @param includeTarget al actualizar no se reasigna el target: el chequeo sigue perteneciendo a
-     *                      la misma IP
+     * @param targetUuid al crear se pasa el UUID del target resuelto
      */
-    private static Map<String, Object> toColumns(HealthCheck check, boolean includeTarget) {
+    private static Map<String, Object> toColumns(HealthCheck check, String targetUuid) {
         Map<String, Object> row = new LinkedHashMap<>();
-        if (includeTarget) {
-            row.put("target_id", check.targetId());
+        if (targetUuid != null) {
+            row.put("target_id", targetUuid);
         }
         row.put("protocol", check.protocol().value());
         row.put("port", check.port());

@@ -96,8 +96,8 @@ function IpCountryModal({
         <div className="modal-header">
           <h3 className="modal-title">
             {isEditMode
-              ? `✏️ Editar Mapeo IP-Country (${initialData.id})`
-              : '➕ Agregar Nuevo Mapeo IP-to-Country'}
+              ? `Editar Mapeo IP-Country (${initialData.id})`
+              : 'Agregar Nuevo Mapeo IP-to-Country'}
           </h3>
           <button className="modal-close-btn" onClick={handleClose}>
             ✕

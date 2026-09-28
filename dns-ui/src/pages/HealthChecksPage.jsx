@@ -112,13 +112,13 @@ function HealthChecksPage() {
           className="btn-primary"
           onClick={() => setIsModalOpen(true)}
         >
-          ➕ Agregar Health Check
+          Agregar Health Check
         </button>
       </header>
 
       {feedback && (
         <div className={`feedback-toast ${feedback.type}`}>
-          <span>{feedback.type === 'success' ? '✅' : '⚠️'}</span>
+          <span>{feedback.type === 'success' ? 'Info:' : 'Atención:'}</span>
           <span>{feedback.text}</span>
           <button
             className="toast-close"
@@ -132,7 +132,6 @@ function HealthChecksPage() {
       {/* Barra de Filtros y Búsqueda */}
       <div className="filters-bar">
         <div className="search-box">
-          <span className="search-icon">🔍</span>
           <input
             type="text"
             placeholder="Buscar por nombre, objetivo o registro..."
@@ -216,21 +215,21 @@ function HealthChecksPage() {
                         title="Ver detalle del check"
                         onClick={() => setViewingCheck(check)}
                       >
-                        👁️
+                        Ver
                       </button>
                       <button
                         className="btn-icon edit"
                         title="Editar Check"
                         onClick={() => setEditingCheck(check)}
                       >
-                        ✏️
+                        Editar
                       </button>
                       <button
                         className="btn-icon delete"
                         title="Eliminar Check"
                         onClick={() => setDeletingCheck(check)}
                       >
-                        🗑️
+                        Eliminar
                       </button>
                     </div>
                   </td>
@@ -259,12 +258,12 @@ function HealthChecksPage() {
         initialData={editingCheck}
       />
 
-      {/* Modal de Visualización Detallada (Boton Ojo 👁️) */}
+      {/* Modal de Visualizacion Detallada */}
       {viewingCheck && (
         <div className="modal-overlay" onClick={() => setViewingCheck(null)}>
           <div className="modal-container" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '640px' }}>
             <div className="modal-header">
-              <h3 className="modal-title">👁️ Detalle del Health Check ({viewingCheck.id})</h3>
+              <h3 className="modal-title">Detalle del Health Check ({viewingCheck.id})</h3>
               <button className="modal-close-btn" onClick={() => setViewingCheck(null)}>
                 ✕
               </button>
@@ -355,7 +354,7 @@ function HealthChecksPage() {
         <div className="modal-overlay" onClick={() => setDeletingCheck(null)}>
           <div className="modal-container" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '480px' }}>
             <div className="modal-header">
-              <h3 className="modal-title">⚠️ Confirmar Eliminación</h3>
+              <h3 className="modal-title">Confirmar Eliminación</h3>
               <button className="modal-close-btn" onClick={() => setDeletingCheck(null)}>
                 ✕
               </button>

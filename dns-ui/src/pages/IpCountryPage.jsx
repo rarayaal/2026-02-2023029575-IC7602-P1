@@ -110,13 +110,13 @@ function IpCountryPage() {
           className="btn-primary"
           onClick={() => setIsModalOpen(true)}
         >
-          ➕ Agregar Rango IP
+          Agregar Rango IP
         </button>
       </header>
 
       {feedback && (
         <div className={`feedback-toast ${feedback.type}`}>
-          <span>{feedback.type === 'success' ? '✅' : '⚠️'}</span>
+          <span>{feedback.type === 'success' ? 'Info:' : 'Atención:'}</span>
           <span>{feedback.text}</span>
           <button
             className="toast-close"
@@ -130,7 +130,6 @@ function IpCountryPage() {
       {/* Barra de Filtros y Búsqueda */}
       <div className="filters-bar">
         <div className="search-box">
-          <span className="search-icon">🔍</span>
           <input
             type="text"
             placeholder="Buscar por país, código ISO o rango IP..."
@@ -178,21 +177,21 @@ function IpCountryPage() {
                         title="Ver detalle del mapeo"
                         onClick={() => setViewingMapping(m)}
                       >
-                        👁️
+                        Ver
                       </button>
                       <button
                         className="btn-icon edit"
                         title="Editar Mapeo"
                         onClick={() => setEditingMapping(m)}
                       >
-                        ✏️
+                        Editar
                       </button>
                       <button
                         className="btn-icon delete"
                         title="Eliminar Mapeo"
                         onClick={() => setDeletingMapping(m)}
                       >
-                        🗑️
+                        Eliminar
                       </button>
                     </div>
                   </td>
@@ -221,12 +220,12 @@ function IpCountryPage() {
         initialData={editingMapping}
       />
 
-      {/* Modal de Visualización Detallada (Boton Ojo 👁️) */}
+      {/* Modal de Visualización Detallada */}
       {viewingMapping && (
         <div className="modal-overlay" onClick={() => setViewingMapping(null)}>
           <div className="modal-container" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '600px' }}>
             <div className="modal-header">
-              <h3 className="modal-title">👁️ Detalle del Mapeo IP-Country ({viewingMapping.id})</h3>
+              <h3 className="modal-title">Detalle del Mapeo IP-Country ({viewingMapping.id})</h3>
               <button className="modal-close-btn" onClick={() => setViewingMapping(null)}>
                 ✕
               </button>
@@ -282,7 +281,7 @@ function IpCountryPage() {
         <div className="modal-overlay" onClick={() => setDeletingMapping(null)}>
           <div className="modal-container" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '480px' }}>
             <div className="modal-header">
-              <h3 className="modal-title">⚠️ Confirmar Eliminación</h3>
+              <h3 className="modal-title">Confirmar Eliminación</h3>
               <button className="modal-close-btn" onClick={() => setDeletingMapping(null)}>
                 ✕
               </button>
