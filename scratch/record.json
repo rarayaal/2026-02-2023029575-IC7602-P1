@@ -1,0 +1,11 @@
+{
+  "domain": "test-domain.com",
+  "type": "single",
+  "ttl": 300,
+  "isActive": true,
+  "targets": [
+    {
+      "ip": "192.168.1.100"
+    }
+  ]
+}

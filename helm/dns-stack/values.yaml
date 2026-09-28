@@ -92,7 +92,7 @@ dnsUi:
   env:
     apiUrl: ""
 
-# Componente Auxiliar: Mock DNS API (Deshabilitado por defecto, superado por dns-api real)
+# Componente Auxiliar: Mock DNS API (Deshabilitado por omisión)
 mockDnsApi:
   enabled: false
   image:

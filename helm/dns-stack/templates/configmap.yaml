@@ -5,6 +5,7 @@ metadata:
   labels:
     {{- include "dns-stack.labels" . | nindent 4 }}
 data:
+  SUPABASE_URL: {{ .Values.supabase.url | quote }}
   POSTGRES_DB: {{ .Values.database.env.postgresDb | quote }}
   POSTGRES_USER: {{ .Values.database.env.postgresUser | quote }}
   DNS_API_HOST: {{ .Values.dnsApi.env.host | quote }}
@@ -17,4 +18,5 @@ data:
   INTERCEPTOR_UDP_PORT: {{ .Values.dnsInterceptor.env.udpPort | quote }}
   DNS_API_URL: {{ .Values.dnsInterceptor.env.dnsApiUrl | quote }}
   VITE_API_URL: {{ .Values.dnsUi.env.apiUrl | quote }}
+  SYNC_INTERVAL_SECONDS: {{ .Values.healthChecker.env.syncIntervalSeconds | quote }}
   MOCK_API_PORT: {{ .Values.mockDnsApi.env.port | quote }}

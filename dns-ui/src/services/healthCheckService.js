@@ -1,3 +1,5 @@
+import { dnsService } from './dnsService';
+
 // Capa de servicio Health Checks conectada al DNS API Java (T-35)
 const API_BASE_URL = import.meta.env.VITE_API_URL || '';
 
@@ -47,8 +49,38 @@ export const healthCheckService = {
    * Crea un nuevo Health Check en el API Java
    */
   async createHealthCheck(newCheckData) {
+    let rawTarget = (newCheckData.targetId || newCheckData.host || newCheckData.ip || '').trim();
+    let resolvedTargetId = rawTarget;
+
+    const isUuid = (str) =>
+      typeof str === 'string' &&
+      /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(str);
+
+    if (!isUuid(resolvedTargetId)) {
+      try {
+        const records = await dnsService.getRecords();
+        for (const r of records) {
+          if (Array.isArray(r.targets)) {
+            const found = r.targets.find((t) => t.ip === rawTarget || t.id === rawTarget);
+            if (found && found.id) {
+              resolvedTargetId = found.id;
+              break;
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('No se pudo resolver el UUID de la IP target:', e);
+      }
+    }
+
+    if (!isUuid(resolvedTargetId)) {
+      throw new Error(
+        `No se encontró ninguna IP registrada en los Registros DNS que coincida con '${rawTarget}'. En Supabase un Health Check debe vincularse a una IP de un Registro DNS existente. Primero crea el Registro DNS con esa IP.`
+      );
+    }
+
     const payload = {
-      targetId: newCheckData.targetId || newCheckData.host || newCheckData.ip,
+      targetId: resolvedTargetId,
       protocol: newCheckData.protocol || newCheckData.type,
       port: Number(newCheckData.port),
       path: newCheckData.path || '/',
