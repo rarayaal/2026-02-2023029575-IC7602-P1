@@ -20,8 +20,10 @@ set "CHART=.\helm\dns-stack"
 set "SECRET=dns-stack-supabase"
 set "ENV_FILE=dns-api\.env"
 
-REM El script se puede ejecutar desde cualquier lado: siempre trabaja sobre la raiz del repositorio.
-cd /d "%~dp0.."
+REM El script se puede ejecutar desde cualquier lado: siempre trabaja sobre la raiz del repositorio,
+REM este el archivo en la raiz o dentro de una carpeta como scripts\.
+cd /d "%~dp0"
+if not exist "dns-api\" cd /d "%~dp0.."
 
 REM ---------------------------------------------------------------------------
 echo.
@@ -153,7 +155,7 @@ echo Ver los logs de un Health Checker:
 echo    kubectl logs -l instance=cr -f
 echo.
 echo Eliminar todo:
-echo    scripts\deploy-kubernetes.bat uninstall
+echo    \deploy-kubernetes.bat uninstall
 echo.
 echo El mismo sistema se puede levantar sin Kubernetes, con Docker Compose:
 echo    docker compose up -d --build
