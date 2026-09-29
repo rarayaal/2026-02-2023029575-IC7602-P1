@@ -425,7 +425,7 @@ A diferencia de los demás componentes, **no escucha en un puerto de red**. Func
 | Lenguaje | GNU C (C11) | Requisito del proyecto; alta eficiencia, bajo consumo y control de sockets a bajo nivel |
 | Cliente HTTP y REST | `libcurl` | Manejo estándar de peticiones HTTP/HTTPS, códigos de estado, Basic Auth y API REST de Supabase |
 | Procesamiento JSON | `cJSON` | Serialización y deserialización ligera de configuraciones y resultados |
-| Conexiones TCP | Sockets POSIX nativos | Medición precisa del handshake TCP con `poll()` y control estricto de timeouts |
+| Conexiones TCP | Sockets POSIX nativos | Medición precisa del handshake TCP con `select()` y control estricto de timeouts |
 | Concurrencia / Distribución | Múltiples nodos geolocalizados | Evalúa la salud y latencia desde distintas regiones para el consenso y la estrategia round-trip |
 #### Cómo funciona el ciclo de vida
 | Etapa | Operación | Qué realiza |
@@ -499,7 +499,7 @@ http://localhost
 
 Al ingresar a esta dirección, el usuario verá la interfaz principal del sistema DNS.
 
-### ¿Qué encontrará el usuario?
+##### ¿Qué encontrará el usuario?
 
 La aplicación permite acceder desde el menú a las principales funciones de administración:
 
@@ -509,7 +509,7 @@ La aplicación permite acceder desde el menú a las principales funciones de adm
 
 Desde estas secciones el usuario puede consultar información y, según la funcionalidad disponible, crear, modificar o eliminar configuraciones.
 
-### Vista inicial
+##### Vista inicial
 
 | Elemento visible | Descripción para el usuario |
 |---|---|
@@ -519,7 +519,7 @@ Desde estas secciones el usuario puede consultar información y, según la funci
 | **Botones de acción** | Permiten realizar operaciones como crear, editar o eliminar registros cuando están disponibles. |
 | **Formularios / ventanas** | Se utilizan para introducir o modificar información. |
 
-### Evidencia — Pantalla principal
+##### Evidencia — Pantalla principal
 
 | Evidencia | Qué verá el usuario | Qué debe observar |
 |---|---|---|
@@ -547,7 +547,7 @@ Cuando una sección está seleccionada, esta debe quedar visualmente diferenciad
 
 Por ejemplo, al seleccionar **Registros**, el usuario verá que esa opción queda marcada como activa y el contenido de la página cambia para mostrar la administración de registros DNS.
 
-### Evidencia — Navegación
+##### Evidencia — Navegación
 
 | Evidencia | Qué verá el usuario | Qué demuestra |
 |---|---|---|
@@ -1135,7 +1135,7 @@ Pruebas específicas de integración entre el frontend `dns-ui` y la infraestruc
 | # | Qué se probó | Cómo reproducirlo | Resultado |
 | :--- | :--- | :--- | :--- |
 | **1** | **Comunicación HTTP / CORS entre UI y Backend Java** | Realizar peticiones `GET`, `POST`, `PUT` y `DELETE` desde la UI (puerto 80) hacia el DNS API Java (puerto 8080). |Las solicitudes resuelven correctamente sin bloqueos de origen cruzado (CORS) utilizando la variable `VITE_API_URL`. |
-| **2** | **Despliegue del Helm Chart en Kubernetes** | Ejecutar los scripts de despliegue `/deploy-kubernetes.sh` o `/deploy-kubernetes.bat`. |  El Pod de `dns-ui` se levanta en Kubernetes montando el ConfigMap y sirviendo el sitio de administración en la red interna del clúster. |
+| **2** | **Despliegue del Helm Chart en Kubernetes** | Ejecutar los scripts de despliegue `deploy-kubernetes.sh` o `deploy-kubernetes.bat`. |  El Pod de `dns-ui` se levanta en Kubernetes montando el ConfigMap y sirviendo el sitio de administración en la red interna del clúster. |
 
 ---
 
@@ -1144,18 +1144,18 @@ Pruebas específicas de integración entre el frontend `dns-ui` y la infraestruc
 | Componente | Estado | Observaciones |
 | --- | --- | --- |
 | **DNS Interceptor** | **Funciona** | Recibe consultas por UDP, distingue las estándar de las no estándar y decide entre resolverlas con los datos del DNS API o delegar el paquete completo en BASE64. Verificado en la sección 5.2: un dominio propio resuelve con la IP registrada y un dominio externo se delega correctamente |
-| Tipo `single` | _Pendiente_ | |
-| Tipo `multi` | _Pendiente_ | |
-| Tipo `weight` | _Pendiente_ | |
-| Tipo `geo` | _Pendiente_ | |
-| Tipo `round-trip` | _Pendiente_ | |
+| Tipo `single` | **Funciona** | Selecciona la primera dirección IP saludable configurada para el dominio. Cuenta con prueba unitaria. |
+| Tipo `multi` | **Funciona** | Distribuye las consultas entre las direcciones IP saludables utilizando un esquema round-robin. Cuenta con prueba unitaria. |
+| Tipo `weight` | **Funciona** | Selecciona aleatoriamente una dirección IP según el peso configurado para cada destino. La lógica está implementada en el motor de resolución, pero actualmente no cuenta con una prueba unitaria específica. |
+| Tipo `geo` | **Funciona parcialmente** | Selecciona la IP asociada al país del cliente cuando existe una coincidencia. Si no se conoce el país o no hay coincidencia, selecciona una IP saludable aleatoriamente. Cuenta con prueba unitaria. |
+| Tipo `round-trip` | **Funciona** | Selecciona la dirección IP saludable con menor latencia promedio registrada. Cuenta con prueba unitaria. |
 | **DNS API** | **Funciona** | Los cuatro grupos de endpoints operan contra la base de datos real: registros, rangos de IP por país, chequeos de salud y resolución externa. Se comunica por HTTP. El enunciado pide HTTPS entre el Interceptor y el API, que queda como trabajo pendiente |
 | **Health Checker** | **Funciona** | Monitoreo continuo mediante TCP y HTTP/HTTPS con validación de códigos de estado, Basic Auth, reintentos y timeouts. Emite telemetría y latencias desde múltiples regiones geográficas.|
 | **DNS UI** | **Funciona** | La interfaz de usuario permite visualizar, consultar y gestionar los registros DNS desde una aplicación web. El usuario puede navegar entre el Dashboard, Registros DNS, Health Checks e IP-to-Country, además de crear, consultar, editar y eliminar configuraciones. También permite consultar el estado de salud de los destinos y visualizar información relacionada con las métricas de latencia RTT. Aplicación web SPA desarrollada con React 18 y Vite, servida mediante Nginx en el puerto 80. Permite administrar los cinco tipos de registros DNS: `single`, `multi`, `weight`, `round-trip` y `geo`. Incluye un Dashboard con estadísticas generales y estados de salud (`Saludable`, `Degradado`, `Fallo`), además de formularios para configurar Health Checks TCP y HTTP con autenticación Basic Auth. El módulo IP-to-Country permite gestionar rangos de direcciones IP mediante notación CIDR y asociarlos con códigos de país. La interfaz también permite consultar el detalle de los registros y las métricas RTT. La comunicación con el DNS API Java se realiza dinámicamente mediante variables de entorno, evitando almacenar credenciales directamente en el código fuente. |
 | **Base de datos** | **Funciona** | Esquema relacional completo en Supabase/PostgreSQL. Las vistas de consenso y triggers calculan la mayoría simple de votos y el RTT promedio automáticamente en tiempo real. |
 
 ---
-# Uso de IA Generativa y Prompts
+## 7. Uso de IA Generativa y Prompts
 
 > Las tareas T-17 a T-23 y T-45 corresponden al DNS API. El trabajo se hizo en sesiones de
 > conversación, revisando cada pieza antes de continuar, así que los prompts que siguen son la
@@ -1164,14 +1164,14 @@ Pruebas específicas de integración entre el frontend `dns-ui` y la infraestruc
 > colección no se exportó como entregable: las pruebas del DNS API están documentadas en la
 > sección 5.1 con el comando equivalente para reproducir cada una.
 
-# T-17 — Estructura base de la API REST
+### T-17 — Estructura base de la API REST
 
-## Descripción
+#### Descripción
 
 Levantar el proyecto Java del DNS API con su servidor HTTP, la configuración por variables de
 entorno y el cliente de la base de datos.
 
-## Prompt de creación
+#### Prompt de creación
 
 Crear un proyecto Maven con Java 21 y Javalin 6 que exponga un servidor HTTP configurable por
 variables de entorno (host, puerto y cantidad de hilos). Incluir un cliente para la API REST de
@@ -1179,7 +1179,7 @@ Supabase construido sobre el cliente HTTP del JDK, un formato único de error en
 respuestas fallidas y un endpoint de salud. La aplicación debe validar la configuración y verificar
 la conexión con la base de datos antes de abrir el puerto.
 
-## Prompt de corrección / ajuste
+#### Prompt de corrección / ajuste
 
 Reducir la anidación de paquetes y eliminar las capas intermedias que solo reenviaban llamadas.
 Reemplazar el manejador genérico de estado 404 por uno que atienda la excepción de ruta no
@@ -1187,7 +1187,7 @@ encontrada, porque el manejador genérico sobrescribía las respuestas 404 que y
 controladores. Capturar la excepción base en lugar de la de tiempo de ejecución, para que un cuerpo
 JSON malformado devuelva 400 y no 500.
 
-## Resultado esperado
+#### Resultado esperado
 
 - Proyecto Maven empaquetado en un único archivo `.jar`.
 - Configuración completa por variables de entorno, sin valores quemados.
@@ -1197,26 +1197,26 @@ JSON malformado devuelva 400 y no 500.
 
 ---
 
-# T-18 — Endpoint `/api/exists`
+### T-18 — Endpoint `/api/exists`
 
-## Descripción
+#### Descripción
 
 Responder al DNS Interceptor si un dominio está registrado en el sistema y de qué tipo es.
 
-## Prompt de creación
+#### Prompt de creación
 
 Implementar `GET /api/exists` recibiendo el parámetro `hostname` y devolviendo si el dominio existe
 y su tipo de balanceo. Debe responder con estado 200 aunque el dominio no exista, usando el campo
 `exists` en `false`, y considerar únicamente los registros activos.
 
-## Prompt de corrección / ajuste
+#### Prompt de corrección / ajuste
 
 Normalizar el nombre consultado antes de buscarlo: pasarlo a minúsculas y quitarle el punto final,
 porque el protocolo DNS no distingue mayúsculas y las herramientas del sistema envían el nombre
 absoluto terminado en punto. Devolver también el nombre ya normalizado en la respuesta y compartir
 esa misma regla con el resto de los endpoints.
 
-## Resultado esperado
+#### Resultado esperado
 
 - Consulta de existencia por nombre de dominio.
 - Respuesta 200 tanto si existe como si no.
@@ -1225,25 +1225,25 @@ esa misma regla con el resto de los endpoints.
 
 ---
 
-# T-19 — Cliente UDP/DNS
+### T-19 — Cliente UDP/DNS
 
-## Descripción
+#### Descripción
 
 Enviar un paquete DNS a un servidor externo por UDP y devolver su respuesta.
 
-## Prompt de creación
+#### Prompt de creación
 
 Implementar un cliente UDP que reciba un paquete DNS ya armado, lo envíe a la dirección y el puerto
 configurados, espere la respuesta y la devuelva. La dirección del servidor y el tiempo de espera
 deben venir de variables de entorno.
 
-## Prompt de corrección / ajuste
+#### Prompt de corrección / ajuste
 
 Abramos un socket nuevo por cada consulta en lugar de reutilizar uno compartido, porque UDP no tiene
 conexiones y dos resoluciones simultáneas podrían leer la respuesta de la otra. Ampliemos el buffer de
 recepción para admitir respuestas con la extensión EDNS0, y recortar el arreglo devuelto al tamaño real recibido.
 
-## Resultado esperado
+#### Resultado esperado
 
 - Envío y recepción de paquetes DNS por UDP.
 - Un socket por consulta, cerrado siempre al terminar.
@@ -1252,27 +1252,27 @@ recepción para admitir respuestas con la extensión EDNS0, y recortar el arregl
 
 ---
 
-# T-20 — Endpoint `/api/dns_resolver`
+### T-20 — Endpoint `/api/dns_resolver`
 
-## Descripción
+#### Descripción
 
 Recibir del Interceptor un paquete DNS codificado en BASE64, resolverlo contra un servidor externo y
 devolver la respuesta en el mismo formato.
 
-## Prompt de creación
+#### Prompt de creación
 
 Implementar `POST /api/dns_resolver` que reciba un cuerpo JSON con el paquete DNS en BASE64, lo
 decodifique, lo envíe por UDP mediante el cliente de la tarea anterior y devuelva la respuesta
 codificada también en BASE64. El API no debe interpretar el contenido del paquete.
 
-## Prompt de corrección / ajuste
+#### Prompt de corrección / ajuste
 
 Agregar validaciones antes de tocar la red: que venga el campo con los datos, que su contenido sea
 BASE64 válido y que el paquete tenga al menos los 12 bytes del encabezado DNS. Diferenciar el fallo
 del servidor externo del fallo propio, devolviendo 502 con el código `dns_unreachable` cuando se
 agota el tiempo de espera, en lugar de un 500 genérico.
 
-## Resultado esperado
+#### Resultado esperado
 
 - Transporte de un protocolo no orientado a conexión sobre uno que sí lo está.
 - Validación del cuerpo recibido antes de enviar nada por la red.
@@ -1281,20 +1281,20 @@ agota el tiempo de espera, en lugar de un 500 genérico.
 
 ---
 
-# T-21 — CRUD de registros DNS
+### T-21 — CRUD de registros DNS
 
-## Descripción
+#### Descripción
 
 Administrar los registros DNS y sus direcciones IP de destino para los cinco tipos de balanceo.
 
-## Prompt de creación
+#### Prompt de creación
 
 Implementar el CRUD completo de `/api/records` soportando los tipos `single`, `multi`, `weight`,
 `round-trip` y `geo`. Cada registro incluye su TTL, si está activo y la lista de destinos con su IP,
 peso, país, estado de salud y latencia promedio. La consulta debe traer el registro y sus destinos
 en una sola petición a la base de datos, aprovechando el anidamiento de recursos de la API REST.
 
-## Prompt de corrección / ajuste
+#### Prompt de corrección / ajuste
 
 Validar según el tipo: una sola IP para `single`, dos o más para `multi`, peso mayor que cero para
 `weight` y código de país para `geo`, además de comprobar el formato de toda dirección IPv4.
@@ -1304,7 +1304,7 @@ activación como un tipo que admita nulo, porque con el tipo primitivo un regist
 campo nacía desactivado. Reportar la latencia solo cuando alguna instancia la haya medido, y
 distinguir el estado desconocido del estado caído cuando la IP nunca ha sido chequeada.
 
-## Resultado esperado
+#### Resultado esperado
 
 - Alta, consulta, modificación y eliminación de registros DNS.
 - Validaciones propias de cada tipo de balanceo.
@@ -1314,27 +1314,27 @@ distinguir el estado desconocido del estado caído cuando la IP nunca ha sido ch
 
 ---
 
-# T-22 — CRUD de IP-to-Country
+### T-22 — CRUD de IP-to-Country
 
-## Descripción
+#### Descripción
 
 Administrar los rangos de direcciones IP asociados a un país y resolver a qué país pertenece una IP.
 
-## Prompt de creación
+#### Prompt de creación
 
 Implementar el CRUD de `/api/ip-country` y un endpoint de búsqueda que reciba una dirección IPv4 y
 devuelva el país, la ciudad y las coordenadas del rango que la contiene. Los rangos se guardan como
 números enteros en la base de datos, así que el API debe convertir entre la notación de puntos y su
 valor numérico.
 
-## Prompt de corrección / ajuste
+#### Prompt de corrección / ajuste
 
 Aceptar también la notación CIDR al registrar un rango, calculando la primera y la última dirección
 a partir del prefijo. Delegar la búsqueda a la función almacenada en la base de datos en lugar de
 traer los rangos al API, y registrar la ruta de búsqueda antes de la ruta con parámetro, porque de
 lo contrario la palabra reservada se interpretaba como el identificador de un rango.
 
-## Resultado esperado
+#### Resultado esperado
 
 - Administración de rangos de IP por país.
 - Conversión entre notación de puntos, CIDR y valor numérico.
@@ -1343,27 +1343,27 @@ lo contrario la palabra reservada se interpretaba como el identificador de un ra
 
 ---
 
-# T-23 — Dockerfile del DNS API
+### T-23 — Dockerfile del DNS API
 
-## Descripción
+#### Descripción
 
 Empaquetar el DNS API en una imagen de contenedor lista para el despliegue.
 
-## Prompt de creación
+#### Prompt de creación
 
 Escribir un Dockerfile de dos etapas: una que compile el proyecto con Maven y el JDK, y otra que
 parta de una imagen con solo el entorno de ejecución de Java y copie únicamente el archivo `.jar`
 resultante. El contenedor debe exponer el puerto 8080 y recibir toda su configuración por variables
 de entorno.
 
-## Prompt de corrección / ajuste
+#### Prompt de corrección / ajuste
 
 Copiar el archivo de dependencias antes que el código fuente, para que la caché de construcción no
 vuelva a descargarlas con cada cambio. Ejecutar el proceso con un usuario sin privilegios, ya que el
 puerto 8080 no los requiere, y excluir el archivo de credenciales en el `.dockerignore` para que no
 quede incluido en la imagen.
 
-## Resultado esperado
+#### Resultado esperado
 
 - Imagen final reducida, sin herramientas de compilación.
 - Construcción con caché de dependencias.
@@ -1372,26 +1372,26 @@ quede incluido en la imagen.
 
 ---
 
-# T-45 — CRUD de health checks
+### T-45 — CRUD de health checks
 
-## Descripción
+#### Descripción
 
 Administrar la configuración de los chequeos de salud que ejecutan los Health Checkers sobre cada IP.
 
-## Prompt de creación
+#### Prompt de creación
 
 Implementar el CRUD de `/api/health-checks`, donde cada chequeo pertenece a una IP de destino
 concreta y define el protocolo (TCP o HTTP), el puerto, el intervalo, el tiempo de espera, los
 reintentos y, para HTTP, la ruta, los códigos de estado esperados y la autenticación básica.
 
-## Prompt de corrección / ajuste
+#### Prompt de corrección / ajuste
 
 Tratar la contraseña de la autenticación básica como un campo de solo escritura: aceptarla al crear,
 devolverla siempre en nulo al consultar y, si no viene en una modificación, omitir esa columna en la
 actualización para conservar la guardada. Descartar los campos propios de HTTP cuando el chequeo es
 TCP, y traducir a un estado 409 la violación de la restricción que permite un solo chequeo por IP.
 
-## Resultado esperado
+#### Resultado esperado
 
 - Configuración de chequeos TCP y HTTP por dirección IP.
 - Un único chequeo por IP, con rechazo 409 del segundo.
@@ -1400,18 +1400,18 @@ TCP, y traducir a un estado 409 la violación de la restricción que permite un 
 
 ---
 
-# T-33 — Estructura base de la UI
+### T-33 — Estructura base de la UI
 
-## Descripción
+#### Descripción
 
 Configurar la aplicación React y su consumo del DNS API.
 
-## Prompt de creación
+#### Prompt de creación
 
 Inicializar la estructura base de la aplicación React con Vite y React Router. Crear el layout principal, el Navbar responsive, los estilos globales en CSS, el Dashboard inicial y la capa de servicios para consumir los endpoints del DNS API Java.
 
 
-## Resultado esperado
+#### Resultado esperado
 
 - Aplicación React estructurada con Vite.
 - Navegación mediante React Router.
@@ -1423,21 +1423,21 @@ Inicializar la estructura base de la aplicación React con Vite y React Router. 
 
 ---
 
-# T-34 — Gestión de registros DNS
+### T-34 — Gestión de registros DNS
 
-## Descripción
+#### Descripción
 
 Crear, modificar y eliminar registros DNS de los tipos single, multi, weight, round-trip y geo.
 
-## Prompt de creación
+#### Prompt de creación
 
 Implementar la pantalla y el modal para crear, listar, editar y eliminar registros DNS soportando los 5 tipos de balanceo: single, multi, weight, round-trip y geo.
 
-## Prompt de corrección / ajuste
+#### Prompt de corrección / ajuste
 
 Corregir el mapeo de targets en CreateRecordModal.jsx y dnsService.js para asegurar que al enviar registros de tipo single, multi, weight, round-trip y geo el payload cumpla exactamente con el contrato esperado por la API Java, sanitizando campos nulos y formateando latencias (avgRttMs) y pesos.
 
-## Resultado esperado
+#### Resultado esperado
 
 - Pantalla para administrar registros DNS.
 - Creación, listado, edición y eliminación de registros.
@@ -1447,21 +1447,21 @@ Corregir el mapeo de targets en CreateRecordModal.jsx y dnsService.js para asegu
 
 ---
 
-# T-35 — Configuración de Health Checks
+### T-35 — Configuración de Health Checks
 
-## Descripción
+#### Descripción
 
 Definir desde la interfaz los Health Checks TCP y HTTP/HTTPS con sus parámetros de configuración.
 
-## Prompt de creación
+#### Prompt de creación
 
 Crear la interfaz gráfica y los servicios para la gestión de monitoreos de salud (Health Checks) en protocolos TCP y HTTP/HTTPS con timeout, reintentos, intervalo, path y basic auth.
 
-## Prompt de corrección / ajuste
+#### Prompt de corrección / ajuste
 
 Ajustar HealthCheckModal.jsx y healthCheckService.js para parsear correctamente los códigos de estado HTTP esperados (convertir string separado por comas a array de enteros), formatear la estructura de basicAuth ({ username, password }) y validar los rangos numéricos de puerto (1-65535) e intervalo.
 
-## Resultado esperado
+#### Resultado esperado
 
 - Gestión de Health Checks desde la interfaz.
 - Soporte para TCP y HTTP/HTTPS.
@@ -1472,21 +1472,21 @@ Ajustar HealthCheckModal.jsx y healthCheckService.js para parsear correctamente 
 
 ---
 
-# T-36 — Gestión de IP-to-Country
+### T-36 — Gestión de IP-to-Country
 
-## Descripción
+#### Descripción
 
 Crear, modificar y eliminar registros de la base de datos IP-to-Country.
 
-## Prompt de creación
+#### Prompt de creación
 
 Desarrollar la pantalla y el modal para administrar la tabla de mapeos IP-to-Country permitiendo notación CIDR, código ISO de país y descripción.
 
-## Prompt de corrección / ajuste
+#### Prompt de corrección / ajuste
 
 Corregir ipCountryService.js para formatear adecuadamente el campo ipRange o notación CIDR desde ipStart e ipEnd, forzar el código ISO de país en mayúsculas (ej. CR, US), y eliminar definitivamente las referencias a 'servicio mock' en los mensajes de carga de la interfaz.
 
-## Resultado esperado
+#### Resultado esperado
 
 - Pantalla para administrar IP-to-Country.
 - Creación, edición y eliminación de registros.
@@ -1496,21 +1496,21 @@ Corregir ipCountryService.js para formatear adecuadamente el campo ipRange o not
 
 ---
 
-# T-37 — Dockerfile de la UI
+### T-37 — Dockerfile de la UI
 
-## Descripción
+#### Descripción
 
 Contenerizar la aplicación React para permitir su ejecución mediante Docker.
 
-## Prompt de creación
+#### Prompt de creación
 
 Crear el Dockerfile de compilación multi-etapa con Node 18 Alpine en el build y Nginx Alpine en el servidor estático.
 
-## Prompt de corrección / ajuste
+#### Prompt de corrección / ajuste
 
 Configurar nginx.conf con la directiva 'try_files $uri $uri/ /index.html;' para resolver el enrutamiento de React Router, evitando errores 404 al recargar rutas como /records o /health-checks dentro del contenedor Docker.
 
-## Resultado esperado
+#### Resultado esperado
 
 - Dockerfile multi-etapa.
 - Etapa de compilación con Node.js.
@@ -1520,21 +1520,21 @@ Configurar nginx.conf con la directiva 'try_files $uri $uri/ /index.html;' para 
 
 ---
 
-# T-38 — Orquestación del Stack
+### T-38 — Orquestación del Stack
 
-## Descripción
+#### Descripción
 
 Integrar los cinco componentes del proyecto mediante Docker Compose y Helm Charts/Kubernetes.
 
-## Prompt de creación
+#### Prompt de creación
 
 Orquestar los cinco componentes del proyecto mediante Docker Compose y Helm Charts en Kubernetes.
 
-## Prompt de corrección / ajuste
+#### Prompt de corrección / ajuste
 
 Corregir en helm/dns-stack/templates/dns-api-deployment.yaml la referencia redundante a ...-secret reemplazándola por el Secret correcto ...-supabase y el helper dns-stack.supabaseEnv, e integrar los 3 checkers GNU C (checker-cr, checker-us, checker-eu) compartiendo las variables de base de datos.
 
-## Resultado esperado
+#### Resultado esperado
 
 - Orquestación mediante Docker Compose.
 - Configuración mediante Helm Charts.
@@ -1545,21 +1545,21 @@ Corregir en helm/dns-stack/templates/dns-api-deployment.yaml la referencia redun
 
 ---
 
-# T-39 — Configuración mediante variables de entorno
+### T-39 — Configuración mediante variables de entorno
 
-## Descripción
+#### Descripción
 
 Verificar que los componentes del sistema no utilicen valores sensibles o configuraciones quemadas directamente en el código.
 
-## Prompt de creación
+#### Prompt de creación
 
 Verificar que toda la configuración del sistema se inyecte dinámicamente por variables de entorno.
 
-## Prompt de corrección / ajuste
+#### Prompt de corrección / ajuste
 
 Auditar el código para eliminar credenciales o URLs hardcodeadas. Configurar _supabase-env.tpl, supabase-secret.yaml y values.yaml en Helm para que SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY y VITE_API_URL se inyecten de forma segura mediante secretos.
 
-## Resultado esperado
+#### Resultado esperado
 
 - Eliminación de credenciales hardcodeadas.
 - Eliminación de URLs configuradas directamente.
@@ -1569,21 +1569,21 @@ Auditar el código para eliminar credenciales o URLs hardcodeadas. Configurar _s
 
 ---
 
-# T-40 — Prueba End-to-End
+### T-40 — Prueba End-to-End
 
-## Descripción
+#### Descripción
 
 Validar el funcionamiento completo del sistema, incluyendo la resolución DNS mediante el contenedor dns-interceptor.
 
-## Prompt de creación
+#### Prompt de creación
 
 Validar el flujo end-to-end completo del sistema incluyendo la resolución DNS y la prueba con resolv.conf.
 
-## Prompt de corrección / ajuste
+#### Prompt de corrección / ajuste
 
 Validar la resolución DNS UDP en el puerto 53 realizando una prueba en un contenedor aislado con /etc/resolv.conf apuntando a la IP del dns-interceptor, comprobando la decodificación BASE64 hacia dns-api, la respuesta dinámica y la visualización de métricas de salud en dns-ui.
 
-## Resultado esperado
+#### Resultado esperado
 
 - Prueba completa del flujo end-to-end.
 - Resolución DNS mediante UDP en el puerto 53.
@@ -1591,11 +1591,15 @@ Validar la resolución DNS UDP en el puerto 53 realizando una prueba en un conte
 - Configuración de /etc/resolv.conf.
 - Verificación de la comunicación con dns-interceptor y dns-api.
 
-## 7. Conclusiones
+## 8. Conclusiones
 
 El DNS Interceptor cumple su función principal como punto de entrada del sistema DNS. Está diseñado para recibir consultas UDP, interpretar los elementos esenciales del protocolo DNS y decidir si una consulta puede resolverse localmente o debe delegarse.
 
 El interceptor utiliza tareas asíncronas para procesar múltiples consultas sin bloquear el ciclo principal de recepción UDP. Esto permite atender varias solicitudes de manera concurrente.
+
+El Health Checker demuestra la conveniencia de utilizar GNU C para tareas de inspección de red en segundo plano. La implementación de sockets POSIX no bloqueantes combinados con select() para pruebas TCP, junto con el uso de libcurl con descarte de cuerpo para HTTP, garantiza mediciones de latencia de alta precisión temporal sin consumir memoria innecesaria ni congelar el hilo de ejecución ante servidores inalcanzables o caídos.
+
+El esquema de consenso por mayoría simple evita falsos positivos en el monitoreo. Al distribuir nodos en distintas regiones que reportan de forma independiente a Supabase, el sistema asegura que la falla de red local de un único nodo no marque un servidor como caído, dejando de enviar tráfico a un servidor solo si la mayoría confirma que está fuera de servicio.
 
 La DNS UI permitió centralizar la administración de los registros DNS, el monitoreo de los servidores y la gestión de ubicaciones por IP en una interfaz sencilla. Esto facilita el trabajo del usuario, ya que puede realizar estas tareas desde la aplicación sin depender de comandos o configuraciones manuales.
 
@@ -1605,9 +1609,13 @@ El DNS API es el punto donde el proyecto demuestra el transporte de un protocolo
 
 Concentrar el acceso a los datos en el DNS API fue determinante para el trabajo en equipo. Como ningún otro componente, salvo los Health Checkers, consulta la base directamente, el Interceptor y la interfaz web dependieron de un contrato HTTP estable y no del esquema de la base de datos. Los cambios de nombres y de columnas se absorbieron dentro del API sin obligar a modificar los demás componentes, lo que permitió que cada persona avanzara en su parte sin bloquear a las otras.
 
+La utilización de Rust junto con tokio para la asincronía fue sumamente eficiente para construir el servidor DNS con alto rendimiento, utilizando referencias compartidas en memoria y ejecutando tareas simples en segundo plano para cada paquete UDP recibido.
+
+El motor de resolución de Rust integra las cinco estrategias single, multi, weight, geo y round-trip, aplicando el filtrado en tiempo real, además de tener la capacidad de empaquetar consultas no estándar o de dominio en BASE64 para el paso de HTTP a DNS API.
+
 ---
 
-## 8. Recomendaciones
+## 9. Recomendaciones
 
 Actualmente el interceptor depende del estado de la DNS API por lo que es recomendable agregar un mecanismo de healthcheck para comprobar periódicamente que puede comunicarse con la API.
 
@@ -1620,3 +1628,11 @@ Implementar un sistema de caché en el navegador,  por ejemplo mediante React Qu
 Implementar HTTPS entre el DNS Interceptor y el DNS API, que es la parte del enunciado que quedó pendiente. Lo recomendable es que el API sirva TLS con un certificado propio y que el Interceptor confíe en él, manteniendo el puerto HTTP en paralelo durante la transición para no interrumpir a la interfaz web mientras se migra.
 
 Agregar una caché de respuestas que respete el TTL de cada registro. Hoy cada consulta que el Interceptor resuelve genera dos llamadas al API y, por lo tanto, dos consultas a la base de datos. Guardar el resultado durante el tiempo de vida del registro reduciría la carga sobre la base y el tiempo de respuesta, que es justamente para lo que existe el TTL dentro del protocolo DNS.
+
+Implementar hilos para evaluar los servidores en paralelo. Actualmente el Health Checker prueba cada destino de forma secuencial, por lo que aumentar el número de registros o de reintentos retrasaría el ciclo de monitoreo. Ejecutarlas en paralelo mantendría los tiempos de sondeo estables.
+
+Agregar una expiración automática a los votos de los nodos inactivos, ya que si un contenedor del Health Checker se apaga, su último reporte podría seguir afectando el consenso. Descartar votos cuyos heartbeats lleven mucho tiempo sin renovarse garantizaría que solo opinen los nodos realmente activos.
+
+Incorporar una capa de caché en memoria dentro del DNS Interceptor. Actualmente cada consulta recibida obliga al interceptor a hacer peticiones HTTP hacia los endpoints de la DNS API; guardar temporalmente los registros resueltos durante el tiempo específico de su TTL reduce significativamente la latencia de respuesta y la carga en la base de datos.
+
+Para mejorar la robustez del servicio ante respuestas grandes, como registros TXT largos, es recomendable implementar EDNS0 para permitir buffers de hasta 4096 bytes y habilitar el socket TCP en el puerto 53 para gestionar paquetes que requieran retransmisión.
