@@ -27,8 +27,10 @@ rojo()  { printf "\033[31m%s\033[0m\n" "$1"; }
 verde() { printf "\033[32m%s\033[0m\n" "$1"; }
 paso()  { printf "\n\033[1m==> %s\033[0m\n" "$1"; }
 
-# El script se puede ejecutar desde cualquier lado: siempre trabaja sobre la raiz del repositorio.
-cd "$(dirname "$0")/.."
+# El script se puede ejecutar desde cualquier lado: siempre trabaja sobre la raiz del repositorio,
+# este el archivo en la raiz o dentro de una carpeta como scripts/.
+cd "$(dirname "$0")"
+[ -d dns-api ] || cd ..
 
 # ---------------------------------------------------------------------------
 paso "Revisando requisitos"
@@ -177,7 +179,7 @@ echo "Ver los logs de un Health Checker:"
 echo "  kubectl logs -l instance=cr -f"
 echo
 echo "Eliminar todo:"
-echo "  ./scripts/deploy-kubernetes.sh --uninstall"
+echo "  ./deploy-kubernetes.sh --uninstall"
 echo
 echo "El mismo sistema se puede levantar sin Kubernetes, con Docker Compose:"
 echo "  docker compose up -d --build"
